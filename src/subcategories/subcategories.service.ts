@@ -10,6 +10,7 @@ import {
   CreateSubcategoryRequestDto,
   UpdateSubcategoryRequestDto,
 } from './dto';
+import slugify from 'slugify';
 
 @Injectable()
 export class SubcategoriesService {
@@ -19,16 +20,6 @@ export class SubcategoriesService {
   ) {}
 
   async create(dto: CreateSubcategoryRequestDto, lang: string) {
-    const hindiTranslation = dto.translations?.find(
-      (t) => t.languageCode === 'hi',
-    );
-
-    // if (!hindiTranslation || !hindiTranslation.name?.trim()) {
-    //   throw new BadRequestException(
-    //     this.i18n.t('common.errors.HINDI_NAME_REQUIRED', { lang }),
-    //   );
-    // }
-
     const category = await this.prisma.category.findUnique({
       where: { id: dto.categoryId },
     });
@@ -39,12 +30,30 @@ export class SubcategoriesService {
       );
     }
 
-    const exists = await this.prisma.subcategory.findUnique({
+    const english = dto.translations.find((t) => t.languageCode === 'en');
+    const slugSource = english?.name?.trim();
+
+    let slug: string;
+
+    if (slugSource) {
+      slug = slugify(slugSource, {
+        lower: true,
+        trim: true,
+      });
+    } else {
+      slug = `subcategory-${Date.now()}`;
+    }
+
+    if (!slug) {
+      throw new BadRequestException(
+        this.i18n.t('common.errors.INVALID_SLUG', { lang }),
+      );
+    }
+
+    const exists = await this.prisma.subcategory.findFirst({
       where: {
-        categoryId_slug: {
-          categoryId: dto.categoryId,
-          slug: dto.slug,
-        },
+        slug,
+        categoryId: dto.categoryId,
       },
     });
 
@@ -56,7 +65,7 @@ export class SubcategoriesService {
 
     return this.prisma.subcategory.create({
       data: {
-        slug: dto.slug,
+        slug,
         categoryId: dto.categoryId,
         translations: {
           create: dto.translations,
@@ -69,29 +78,33 @@ export class SubcategoriesService {
     const subcategories = await this.prisma.subcategory.findMany({
       where: { categoryId },
       include: {
-        translations: {
-          where: {
-            languageCode: { in: [lang, 'hi'] },
-          },
-        },
+        translations: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
     return subcategories.map((sub) => {
-      const translation =
-        sub.translations.find(
-          (t: SubcategoryTranslation) => t.languageCode === lang,
-        ) ??
-        sub.translations.find(
+      let translation = sub.translations.find(
+        (t: SubcategoryTranslation) => t.languageCode === lang,
+      );
+
+      if (!translation && lang !== 'hi') {
+        translation = sub.translations.find(
           (t: SubcategoryTranslation) => t.languageCode === 'hi',
         );
+      }
+
+      if (!translation) {
+        translation = sub.translations[0];
+      }
 
       return {
         id: sub.id,
         slug: sub.slug,
-        name: translation?.name ?? null,
-        description: translation?.description ?? null,
+        categoryId: sub.categoryId,
+        lang: translation.languageCode,
+        name: translation.name,
+        description: translation.description,
       };
     });
   }
@@ -108,14 +121,6 @@ export class SubcategoriesService {
     }
 
     if (dto.translations) {
-      const hindi = dto.translations.find((t) => t.languageCode === 'hi');
-
-      // if (!hindi || !hindi.name || !hindi.name.trim()) {
-      //   throw new BadRequestException(
-      //     this.i18n.t('common.errors.HINDI_TRANSLATION_REQUIRED', { lang }),
-      //   );
-      // }
-
       await this.prisma.subcategoryTranslation.deleteMany({
         where: {
           subcategoryId: id,
@@ -138,6 +143,7 @@ export class SubcategoriesService {
     };
   }
 
+  // ✅ REMOVE
   async remove(id: number, lang: string) {
     const subcategory = await this.prisma.subcategory.findUnique({
       where: { id },
@@ -149,7 +155,9 @@ export class SubcategoriesService {
       );
     }
 
-    await this.prisma.subcategory.delete({ where: { id } });
+    await this.prisma.subcategory.delete({
+      where: { id },
+    });
 
     return {
       message: this.i18n.t('common.success.SUBCATEGORY_DELETED', { lang }),

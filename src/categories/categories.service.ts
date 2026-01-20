@@ -18,7 +18,7 @@ export class CategoryService {
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
     const english = dto.translations.find((t) => t.languageCode === 'en');
-    const hindi = dto.translations.find((t) => t.languageCode === 'hi');
+    // const hindi = dto.translations.find((t) => t.languageCode === 'hi');
 
     const slugSource = english?.name?.trim();
 
@@ -98,7 +98,7 @@ export class CategoryService {
     }
 
     if (dto.translations) {
-      const hindi = dto.translations.find((t) => t.languageCode === 'hi');
+      // const hindi = dto.translations.find((t) => t.languageCode === 'hi');
 
       // if (!hindi || !hindi.name || !hindi.name.trim()) {
       //   throw new BadRequestException(
