@@ -51,7 +51,7 @@ export class ContentTypeService {
         data: {
           categoryId: dto.categoryId,
           subcategoryId: dto.subcategoryId,
-          contentYear: dto.contentYear,
+          contentYear: dto.contentYear ?? new Date().getFullYear(),
           translations: {
             create: dto.translations,
           },
