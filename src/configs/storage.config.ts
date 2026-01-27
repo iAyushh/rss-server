@@ -9,7 +9,7 @@ export const storageConfigFactory = registerAs('storage', () => ({
     '.jpg',
     '.jpeg',
     '.pdf',
-    '.word',
+    '.docx',
     '.txt',
     '.csv',
     '.xls',
