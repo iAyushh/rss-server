@@ -10,8 +10,9 @@ export class CreateContentTypeDto {
   @IsInt()
   subcategoryId?: number;
 
+  @IsOptional()
   @IsInt()
-  contentYear: number;
+  contentYear?: number;
 
   @IsArray()
   @ValidateNested({ each: true })
