@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,13 +9,20 @@ import { I18nService } from 'nestjs-i18n';
 import { CategoryTranslation } from '@prisma/client';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
 import slugify from 'slugify';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class CategoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
+
+  private async invalidateCache() {
+    await this.cache.del('categories:hi');
+    await this.cache.del('categories:en');
+  }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
     const english = dto.translations.find((t) => t.languageCode === 'en');
@@ -46,7 +54,7 @@ export class CategoryService {
       );
     }
 
-    return this.prisma.category.create({
+    const category = await this.prisma.category.create({
       data: {
         slug,
         translations: {
@@ -54,8 +62,16 @@ export class CategoryService {
         },
       },
     });
+
+    await this.invalidateCache();
+    return category;
   }
   async findAll(lang: string) {
+    const cacheKey = `categories:${lang}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const categories = await this.prisma.category.findMany({
       include: {
         translations: true,
@@ -63,7 +79,7 @@ export class CategoryService {
       orderBy: { createdAt: 'asc' },
     });
 
-    return categories.map((cat) => {
+    const result = categories.map((cat) => {
       let translation = cat.translations.find(
         (t: CategoryTranslation) => t.languageCode === lang,
       );
@@ -84,6 +100,8 @@ export class CategoryService {
         description: translation.description,
       };
     });
+    await this.cache.set(cacheKey, result, 600);
+    return result;
   }
 
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
@@ -134,6 +152,7 @@ export class CategoryService {
         );
       }
     });
+    await this.invalidateCache();
 
     return {
       message: this.i18n.t('common.success.CATEGORY_UPDATED', { lang }),
@@ -162,6 +181,7 @@ export class CategoryService {
     }
 
     await this.prisma.category.delete({ where: { id } });
+    await this.invalidateCache();
 
     return {
       message: this.i18n.t('common.success.CATEGORY_DELETED', { lang }),

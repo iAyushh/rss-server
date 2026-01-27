@@ -38,7 +38,11 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
       inject: [StorageService],
     }),
 
-    CacheModule.register({ isGlobal: true, ttl: 1 }),
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 600,
+      max: 1000,
+    }),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     CommonModule,

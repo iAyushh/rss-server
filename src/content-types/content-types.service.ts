@@ -1,18 +1,26 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
 import { I18nService } from 'nestjs-i18n';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class ContentTypeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
+
+  private async invalidateCache() {
+    await this.cache.del('content-types:hi');
+    await this.cache.del('content-types:en');
+  }
 
   async create(dto: CreateContentTypeDto) {
     // 1. Validate category exists
@@ -38,7 +46,7 @@ export class ContentTypeService {
     }
 
     // 3. Transactional create
-    return this.prisma.$transaction(async (tx) => {
+    const content = await this.prisma.$transaction(async (tx) => {
       return tx.contentType.create({
         data: {
           categoryId: dto.categoryId,
@@ -53,29 +61,32 @@ export class ContentTypeService {
         },
       });
     });
+
+    await this.invalidateCache();
+
+    return content;
   }
 
-  async findAll(lang: string) {
+  async findAll(lang: string, categoryId?: number, subcategoryId?: number) {
+    const cacheKey = `content-types:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const contents = await this.prisma.contentType.findMany({
+      where: {
+        categoryId: categoryId ?? undefined,
+        subcategoryId: subcategoryId ?? undefined,
+      },
       include: {
         translations: true,
-        category: {
-          select: {
-            id: true,
-            slug: true,
-          },
-        },
-        subcategory: {
-          select: {
-            id: true,
-            slug: true,
-          },
-        },
+        category: { select: { id: true, slug: true } },
+        subcategory: { select: { id: true, slug: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
     });
 
-    return contents
+    const result = contents
       .filter((content) => content.translations.length > 0)
       .map((content) => {
         const translation =
@@ -99,6 +110,8 @@ export class ContentTypeService {
           createdAt: content.createdAt,
         };
       });
+    await this.cache.set(cacheKey, result, 300);
+    return result;
   }
 
   //Update
@@ -158,6 +171,7 @@ export class ContentTypeService {
       }
     });
 
+    await this.invalidateCache();
     return {
       message: this.i18n.t('common.success.CONTENT_UPDATED', { lang }),
     };
@@ -174,6 +188,7 @@ export class ContentTypeService {
     }
 
     await this.prisma.contentType.delete({ where: { id } });
+    await this.invalidateCache();
 
     return {
       success: true,
