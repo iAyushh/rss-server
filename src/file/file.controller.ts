@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { FileService } from './file.service';
 import { ApiTags } from '@nestjs/swagger';
+import { FileType } from '@prisma/client';
+import { PaginatedDto } from '@Common';
 
 @ApiTags('Files')
 @Controller('files')
@@ -19,10 +21,17 @@ export class FileController {
     return this.fileService.getFilesByContentType(id);
   }
   @Get()
-  getAll(@Query('contentTypeId') contentTypeId?: string) {
-    return this.fileService.getAllFiles(
-      contentTypeId ? Number(contentTypeId) : undefined,
-    );
+  getAll(
+    @Query() pagination: PaginatedDto,
+    @Query('contentTypeId') contentTypeId?: number,
+    @Query('type') type?: FileType,
+  ) {
+    return this.fileService.getAllFiles({
+      contentTypeId,
+      type,
+      skip: pagination.skip ?? 0,
+      take: pagination.take ?? 20,
+    });
   }
 
   @Delete(':id')

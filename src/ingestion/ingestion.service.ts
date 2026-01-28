@@ -11,12 +11,11 @@ export class IngestionService {
     private readonly prisma: PrismaService,
     private readonly fileService: FileService,
   ) {}
+
   private validateFiles(files: Express.Multer.File[], type: FileType) {
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
 
-    if (!allowedMimes || allowedMimes.length === 0) {
-      return;
-    }
+    if (!allowedMimes || allowedMimes.length === 0) return;
 
     for (const file of files) {
       if (!allowedMimes.includes(file.mimetype)) {
@@ -33,11 +32,20 @@ export class IngestionService {
     });
 
     if (!content) {
-      throw new Error('Content type not found');
+      throw new BadRequestException('Invalid contentTypeId');
     }
 
     this.validateFiles(files, dto.type);
-    const parsedMetadata = dto.metadata ? JSON.parse(dto.metadata) : {};
+
+    let parsedMetadata: Record<string, string> = {};
+    if (dto.metadata) {
+      try {
+        parsedMetadata = JSON.parse(dto.metadata);
+      } catch {
+        throw new BadRequestException('Invalid metadata JSON');
+      }
+    }
+
     const assets = await this.fileService.attachFiles(
       this.prisma,
       dto.contentTypeId,
