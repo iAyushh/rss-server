@@ -180,6 +180,17 @@ export class CategoryService {
       );
     }
 
+    const contentCount = await this.prisma.contentType.count({
+      where: {
+        categoryId: id,
+      },
+    });
+    if (contentCount > 0) {
+      throw new BadRequestException(
+        'Warning: category has content types remove them first',
+      );
+    }
+
     await this.prisma.category.delete({ where: { id } });
     await this.invalidateCache();
 

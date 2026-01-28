@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, FileType, FileAsset, FileMetadata } from '@prisma/client';
+import { Prisma, FileType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+type FileWithMetadata = Prisma.FileAssetGetPayload<{
+  include: {
+    metadata: true;
+  };
+}>;
 
 @Injectable()
 export class FileService {
@@ -10,14 +16,29 @@ export class FileService {
     return `${process.env.APP_URL}/uploads/${storageKey}`;
   }
 
+  private formatFile(file: FileWithMetadata) {
+    return {
+      id: file.id,
+      contentTypeId: file.contentTypeId,
+      fileName: file.fileName,
+      fileSize: file.fileSize,
+      fileType: file.fileType,
+      uploadedAt: file.uploadedAt,
+      url: this.getPublicUrl(file.storageKey),
+      metadata: Object.fromEntries(file.metadata.map((m) => [m.key, m.value])),
+    };
+  }
+
   async attachFiles(
-    prisma: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient,
     contentTypeId: number,
     files: Express.Multer.File[],
     fileType: FileType,
     metadata?: Record<string, string>,
   ) {
-    await prisma.fileAsset.createMany({
+    if (!files?.length) return [];
+
+    await tx.fileAsset.createMany({
       data: files.map((file) => ({
         contentTypeId,
         fileName: file.originalname,
@@ -28,12 +49,14 @@ export class FileService {
       })),
     });
 
-    const assets = await prisma.fileAsset.findMany({
+    const assets = await tx.fileAsset.findMany({
       where: { contentTypeId },
       orderBy: { uploadedAt: 'desc' },
+      include: {
+        metadata: true,
+      },
     });
 
-    // Save metadata (if provided)
     if (metadata && Object.keys(metadata).length > 0) {
       const metadataRows: Prisma.FileMetadataCreateManyInput[] = [];
 
@@ -47,7 +70,7 @@ export class FileService {
         }
       }
 
-      await prisma.fileMetadata.createMany({
+      await tx.fileMetadata.createMany({
         data: metadataRows,
       });
     }
@@ -64,40 +87,33 @@ export class FileService {
       },
     });
 
-    return files.map((file: FileAsset & { metadata: FileMetadata[] }) => ({
-      id: file.id,
-      fileName: file.fileName,
-      fileSize: file.fileSize,
-      mimeType: file.mimeType,
-      fileType: file.fileType,
-      uploadedAt: file.uploadedAt,
-      url: this.getPublicUrl(file.storageKey),
-      metadata: Object.fromEntries(
-        file.metadata.map((m: FileMetadata) => [m.key, m.value]),
-      ),
-    }));
+    return files.map((f) => this.formatFile(f));
   }
 
-  async getAllFiles(contentTypeId?: number) {
-    const files = await this.prisma.fileAsset.findMany({
-      where: contentTypeId ? { contentTypeId } : undefined,
-      orderBy: { uploadedAt: 'desc' },
-      include: {
-        metadata: true,
-      },
-    });
+  async getAllFiles(params?: {
+    contentTypeId?: number;
+    type?: FileType;
+    skip?: number;
+    take?: number;
+  }) {
+    const { contentTypeId, type, skip = 0, take = 20 } = params || {};
 
-    return files.map((file: FileAsset & { metadata: FileMetadata[] }) => ({
-      id: file.id,
-      contentTypeId: file.contentTypeId,
-      fileName: file.fileName,
-      fileSize: file.fileSize,
-      mimeType: file.mimeType,
-      fileType: file.fileType,
-      uploadedAt: file.uploadedAt,
-      url: this.getPublicUrl(file.storageKey),
-      metadata: Object.fromEntries(file.metadata.map((m) => [m.key, m.value])),
-    }));
+    const where: Prisma.FileAssetWhereInput = {
+      ...(contentTypeId && { contentTypeId }),
+      ...(type && { fileType: type }),
+    };
+
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        include: { metadata: true },
+        skip,
+        take,
+        orderBy: { uploadedAt: 'desc' },
+      }),
+      this.prisma.fileAsset.count({ where }),
+    ]);
+    return { files, total };
   }
 
   async deleteFile(id: number) {
@@ -120,6 +136,7 @@ export class FileService {
 
     return {
       success: true,
+      deletedId: id,
       message: 'File deleted successfully',
     };
   }

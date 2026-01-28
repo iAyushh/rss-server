@@ -216,6 +216,8 @@ enum FileType {
   TEXT
   CSV
   EXCEL
+  AUDIO
+  VIDEO
   OTHER
 }
 
