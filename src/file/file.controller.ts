@@ -33,6 +33,18 @@ export class FileController {
       take: pagination.take ?? 20,
     });
   }
+  @Get('subcategory/:id')
+  getBySubcategory(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() pagination: PaginatedDto,
+    @Query('type') type?: FileType,
+  ) {
+    return this.fileService.getFilesBySubcategory(id, {
+      skip: pagination.skip,
+      take: pagination.take,
+      type,
+    });
+  }
 
   @Delete(':id')
   async deleteFile(@Param('id', ParseIntPipe) id: number) {

@@ -50,11 +50,13 @@ export class FileService {
     });
 
     const assets = await tx.fileAsset.findMany({
-      where: { contentTypeId },
-      orderBy: { uploadedAt: 'desc' },
-      include: {
-        metadata: true,
+      where: {
+        contentTypeId,
+        storageKey: {
+          in: files.map((f) => f.filename),
+        },
       },
+      include: { metadata: true },
     });
 
     if (metadata && Object.keys(metadata).length > 0) {
@@ -113,7 +115,41 @@ export class FileService {
       }),
       this.prisma.fileAsset.count({ where }),
     ]);
-    return { files, total };
+    return { files: files.map((f) => this.formatFile(f)), total };
+  }
+
+  async getFilesBySubcategory(
+    subcategoryId: number,
+    params?: {
+      skip?: number;
+      take?: number;
+      type?: FileType;
+    },
+  ) {
+    const { skip = 0, take = 20, type } = params || {};
+
+    const where: Prisma.FileAssetWhereInput = {
+      ...(type && { fileType: type }),
+      contentType: {
+        subcategoryId,
+      },
+    };
+
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        include: { metadata: true },
+        orderBy: { uploadedAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.fileAsset.count({ where }),
+    ]);
+
+    return {
+      files: files.map((f) => this.formatFile(f)),
+      total,
+    };
   }
 
   async deleteFile(id: number) {
