@@ -115,43 +115,31 @@ export class CategoryService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      if (dto.translations?.length) {
-        // optional: remove translations that are no longer sent
-        await tx.categoryTranslation.deleteMany({
-          where: {
-            categoryId: id,
-            languageCode: {
-              notIn: dto.translations.map((t) => t.languageCode),
-            },
-          },
-        });
-
-        // upsert translations
-        await Promise.all(
-          dto.translations.map((t) =>
-            tx.categoryTranslation.upsert({
-              where: {
-                categoryId_languageCode: {
-                  categoryId: id,
-                  languageCode: t.languageCode,
-                },
-              },
-              update: {
-                name: t.name,
-                description: t.description ?? null,
-              },
-              create: {
+    if (dto.translations?.length) {
+      await this.prisma.$transaction(
+        dto.translations.map((t) =>
+          this.prisma.categoryTranslation.upsert({
+            where: {
+              categoryId_languageCode: {
                 categoryId: id,
                 languageCode: t.languageCode,
-                name: t.name,
-                description: t.description ?? null,
               },
-            }),
-          ),
-        );
-      }
-    });
+            },
+            update: {
+              name: t.name,
+              description: t.description ?? null,
+            },
+            create: {
+              categoryId: id,
+              languageCode: t.languageCode,
+              name: t.name,
+              description: t.description ?? null,
+            },
+          }),
+        ),
+      );
+    }
+
     await this.invalidateCache();
 
     return {

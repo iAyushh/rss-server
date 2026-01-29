@@ -127,25 +127,16 @@ export class ContentTypeService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // update base fields if provided
       await tx.contentType.update({
         where: { id },
         data: {
-          contentYear: dto.contentYear,
-          status: dto.status,
+          contentYear: dto.contentYear ?? undefined,
+          status: dto.status ?? undefined,
         },
       });
 
       if (dto.translations?.length) {
-        // optional cleanup
-        await tx.contentTypeTranslation.deleteMany({
-          where: {
-            contentTypeId: id,
-            languageCode: {
-              notIn: dto.translations.map((t) => t.languageCode),
-            },
-          },
-        });
-
         await Promise.all(
           dto.translations.map((t) =>
             tx.contentTypeTranslation.upsert({
@@ -172,6 +163,7 @@ export class ContentTypeService {
     });
 
     await this.invalidateCache();
+
     return {
       message: this.i18n.t('common.success.CONTENT_UPDATED', { lang }),
     };

@@ -138,21 +138,12 @@ export class SubcategoriesService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      if (dto.translations?.length) {
-        // optional: remove translations not sent anymore
-        await tx.subcategoryTranslation.deleteMany({
-          where: {
-            subcategoryId: id,
-            languageCode: {
-              notIn: dto.translations.map((t) => t.languageCode),
-            },
-          },
-        });
+    const translations = dto.translations;
 
-        // upsert translations
+    if (translations && translations.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
         await Promise.all(
-          dto.translations.map((t) =>
+          translations.map((t) =>
             tx.subcategoryTranslation.upsert({
               where: {
                 subcategoryId_languageCode: {
@@ -173,8 +164,9 @@ export class SubcategoriesService {
             }),
           ),
         );
-      }
-    });
+      });
+    }
+
     await this.invalidateCache(subcategory.categoryId);
 
     return {
