@@ -1,0 +1,18 @@
+{
+    "errors": {
+        "CATEGORY_ALREADY_EXISTS": "यह श्रेणी पहले से मौजूद है",
+        "CATEGORY_NOT_FOUND": "श्रेणी नहीं मिली",
+        "SUBCATEGORY_ALREADY_EXISTS": "उप-श्रेणी पहले से मौजूद है",
+        "SUBCATEGORY_NOT_FOUND": "उप-श्रेणी नहीं मिली",
+        "CATEGORY_HAS_SUBCATEGORIES": "इस श्रेणी में उप-श्रेणियाँ मौजूद हैं। पहले उन्हें हटाएँ।"
+    },
+    "success": {
+        "CATEGORY_CREATED": "श्रेणी सफलतापूर्वक बनाई गई",
+        "CATEGORY_DELETED": "श्रेणी सफलतापूर्वक हटाई गई",
+        "SUBCATEGORY_CREATED": "उप-श्रेणी सफलतापूर्वक बनाई गई",
+        "SUBCATEGORY_DELETED": "उप-श्रेणी सफलतापूर्वक हटाई गई",
+        "CATEGORY_UPDATED": "श्रेणी सफलतापूर्वक अपडेट की गई",
+        "SUBCATEGORY_UPDATED": "उप-श्रेणी सफलतापूर्वक अपडेट की गई",
+         "CONTENT_UPDATED": "Content updated(HINDI)"
+    }
+}

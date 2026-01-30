@@ -1,0 +1,311 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           Int         @id @default(autoincrement())
+  firstname    String
+  lastname     String
+  email        String      @unique
+  profileImage String?     @map("profile_image")
+  status       AdminStatus @default(Active)
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  meta         AdminMeta?
+
+  @@map("admin")
+}
+
+model AdminMeta {
+  passwordSalt String? @map("password_salt")
+  passwordHash String? @map("password_hash")
+  adminId      Int     @unique @map("admin_id")
+  admin        Admin   @relation(fields: [adminId], references: [id])
+
+  @@map("admin_meta")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  firstname    String
+  lastname     String
+  username     String?       @unique
+  email        String        @unique
+  dialCode     String?       @map("dial_code")
+  mobile       String?       @unique
+  profileImage String?       @map("profile_image")
+  isVerified   Boolean       @default(false) @map("is_verified")
+  country      String?
+  status       UserStatus    @default(Active)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  meta         UserMeta?
+  settings     UserSetting[]
+
+  @@map("user")
+}
+
+model UserMeta {
+  googleId     String? @unique @map("google_id")
+  passwordSalt String? @map("password_salt")
+  passwordHash String? @map("password_hash")
+  userId       Int     @unique @map("user_id")
+  user         User    @relation(fields: [userId], references: [id])
+
+  @@map("user_meta")
+}
+
+model Otp {
+  code             String
+  attempt          Int          @default(1) @db.SmallInt
+  lastSentAt       DateTime     @default(now()) @map("last_sent_at")
+  retries          Int          @default(0) @db.SmallInt
+  transport        OtpTransport
+  target           String
+  lastCodeVerified Boolean      @default(false) @map("last_code_verified")
+  blocked          Boolean      @default(false)
+
+  @@unique([transport, target])
+  @@map("otp")
+}
+
+model Setting {
+  id               Int             @id @default(autoincrement())
+  mappedTo         String          @map("mapped_to")
+  text             String          @default("")
+  description      String          @default("")
+  type             SettingType
+  context          SettingContext
+  default          Json
+  isDefinedOptions Boolean         @map("is_defined_options")
+  parentId         Int?            @map("parent_id")
+  dependsOn        Setting?        @relation("SubSettings", fields: [parentId], references: [id])
+  subSettings      Setting[]       @relation("SubSettings")
+  options          SettingOption[]
+  systemSettings   SystemSetting?
+  userSettings     UserSetting[]
+
+  @@unique([context, mappedTo])
+  @@map("setting")
+}
+
+model SettingOption {
+  id        Int     @id @default(autoincrement())
+  text      String  @default("")
+  value     String
+  settingId Int     @map("setting_id")
+  setting   Setting @relation(fields: [settingId], references: [id])
+
+  @@unique([settingId, value])
+  @@map("setting_option")
+}
+
+model UserSetting {
+  selection Json
+  userId    Int     @map("user_id")
+  settingId Int     @map("setting_id")
+  setting   Setting @relation(fields: [settingId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@id([userId, settingId])
+  @@map("user_setting")
+}
+
+model SystemSetting {
+  selection Json
+  settingId Int     @id @map("setting_id")
+  setting   Setting @relation(fields: [settingId], references: [id])
+
+  @@map("system_setting")
+}
+
+enum AdminStatus {
+  Active @map("active")
+
+  @@map("admin_status")
+}
+
+enum UserStatus {
+  Active  @map("active")
+  Blocked @map("blocked")
+
+  @@map("user_status")
+}
+
+enum OtpTransport {
+  Email  @map("email")
+  Mobile @map("mobile")
+
+  @@map("otp_transport")
+}
+
+enum SettingType {
+  Binary       @map("binary")
+  MultiSelect  @map("multi_select")
+  SingleSelect @map("single_select")
+
+  @@map("setting_type")
+}
+
+enum SettingContext {
+  User   @map("user")
+  System @map("System")
+
+  @@map("setting_context")
+}
+
+model Category {
+  id            Int                   @id @default(autoincrement())
+  slug          String                @unique
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  translations  CategoryTranslation[]
+  subcategories Subcategory[]
+  contentTypes  ContentType[]
+
+  @@map("category")
+}
+
+model CategoryTranslation {
+  id           Int      @id @default(autoincrement())
+  categoryId   Int      @map("category_id")
+  languageCode String   @map("language_code")
+  name         String
+  description  String?
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, languageCode])
+  @@map("category_translation")
+}
+
+model Subcategory {
+  id           Int                      @id @default(autoincrement())
+  slug         String
+  categoryId   Int                      @map("category_id")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+  category     Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  translations SubcategoryTranslation[]
+  contentTypes ContentType[]
+
+  @@unique([categoryId, slug])
+  @@map("subcategory")
+}
+
+model SubcategoryTranslation {
+  id            Int         @id @default(autoincrement())
+  subcategoryId Int         @map("subcategory_id")
+  languageCode  String      @map("language_code")
+  name          String
+  description   String?
+  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([subcategoryId, languageCode])
+  @@map("subcategory_translation")
+}
+
+enum FileType {
+  IMAGE
+  PDF
+  WORD
+  TEXT
+  CSV
+  EXCEL
+  AUDIO
+  VIDEO
+  OTHER
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model ContentType {
+  id Int @id @default(autoincrement())
+
+  categoryId    Int  @map("category_id")
+  subcategoryId Int? @map("subcategory_id")
+
+  contentYear Int           @map("content_year") // logical year (NOT upload year)
+  status      ContentStatus @default(DRAFT)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+
+  translations ContentTypeTranslation[]
+  files        FileAsset[]
+  metadata     ContentMetadata[]
+
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([contentYear])
+  @@map("content_type")
+}
+
+model ContentTypeTranslation {
+  id            Int     @id @default(autoincrement())
+  contentTypeId Int     @map("content_type_id")
+  languageCode  String  @map("language_code")
+  name          String
+  description   String?
+
+  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([contentTypeId, languageCode])
+  @@map("content_type_translation")
+}
+
+model FileAsset {
+  id         Int      @id @default(autoincrement())
+  fileName   String   @map("file_name")
+  fileSize   Int      @map("file_size")
+  mimeType   String   @map("mime_type")
+  storageKey String   @map("storage_key")
+  fileType   FileType @map("file_type")
+
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  contentTypeId Int         @map("content_type_id")
+  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  metadata FileMetadata[]
+
+  @@index([fileType])
+  @@index([contentTypeId])
+  @@map("file_asset")
+}
+
+model FileMetadata {
+  id     Int    @id @default(autoincrement())
+  fileId Int    @map("file_id")
+  key    String
+  value  String
+
+  file FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@map("file_metadata")
+}
+
+model ContentMetadata {
+  id            Int    @id @default(autoincrement())
+  contentTypeId Int    @map("content_type_id")
+  key           String
+  value         String
+
+  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([contentTypeId])
+  @@map("content_metadata")
+}
