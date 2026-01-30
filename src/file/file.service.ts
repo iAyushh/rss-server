@@ -118,40 +118,137 @@ export class FileService {
     return { files: files.map((f) => this.formatFile(f)), total };
   }
 
+  async getFilesByCategory(
+    categoryId: number,
+    params?: {
+      skip?: number;
+      take?: number;
+      type?: FileType;
+      lang: string;
+    },
+  ) {
+    const { skip = 0, take = 20, type, lang } = params || {};
+
+    let translation = await this.prisma.categoryTranslation.findFirst({
+      where: {
+        categoryId,
+        languageCode: lang,
+      },
+      select: { name: true },
+    });
+    if (!translation) {
+      translation = await this.prisma.categoryTranslation.findFirst({
+        where: {
+          categoryId,
+          languageCode: 'hi',
+        },
+        select: {
+          name: true,
+        },
+      });
+    }
+
+    if (!translation) {
+      return { files: [], total: 0 };
+    }
+
+    const files = await this.prisma.fileAsset.findMany({
+      where: {
+        ...(type && { fileType: type }),
+
+        metadata: {
+          some: {
+            key: 'category',
+            value: translation.name,
+          },
+        },
+
+        // subcategory NOT present (direct uploads)
+        AND: [
+          {
+            metadata: {
+              none: {
+                key: 'subcategory',
+                value: {
+                  not: '',
+                },
+              },
+            },
+          },
+        ],
+      },
+      include: { metadata: true },
+      orderBy: { uploadedAt: 'desc' },
+      skip,
+      take,
+    });
+
+    return {
+      files: files.map((f) => this.formatFile(f)),
+      total: files.length,
+    };
+  }
+
   async getFilesBySubcategory(
     subcategoryId: number,
     params?: {
       skip?: number;
       take?: number;
       type?: FileType;
+      lang: string;
     },
   ) {
-    const { skip = 0, take = 20, type } = params || {};
+    const { skip = 0, take = 20, type, lang } = params || {};
 
-    const where: Prisma.FileAssetWhereInput = {
-      ...(type && { fileType: type }),
-      contentType: {
+    let translation = await this.prisma.subcategoryTranslation.findFirst({
+      where: {
         subcategoryId,
+        languageCode: lang,
       },
-    };
+      select: {
+        name: true,
+      },
+    });
 
-    const [files, total] = await Promise.all([
-      this.prisma.fileAsset.findMany({
-        where,
-        include: { metadata: true },
-        orderBy: { uploadedAt: 'desc' },
-        skip,
-        take,
-      }),
-      this.prisma.fileAsset.count({ where }),
-    ]);
+    if (!translation) {
+      translation = await this.prisma.subcategoryTranslation.findFirst({
+        where: {
+          subcategoryId,
+          languageCode: 'hi',
+        },
+        select: {
+          name: true,
+        },
+      });
+    }
+    if (!translation) {
+      return {
+        files: [],
+        total: 0,
+      };
+    }
+    const files = await this.prisma.fileAsset.findMany({
+      where: {
+        ...(type && { fileType: type }),
+
+        metadata: {
+          some: {
+            key: 'subcategory',
+            value: translation.name,
+          },
+        },
+      },
+      include: { metadata: true },
+      orderBy: { uploadedAt: 'desc' },
+      skip,
+      take,
+    });
 
     return {
       files: files.map((f) => this.formatFile(f)),
-      total,
+      total: files.length,
     };
   }
-
   async deleteFile(id: number) {
     const file = await this.prisma.fileAsset.findUnique({
       where: { id },

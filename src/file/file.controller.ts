@@ -10,6 +10,7 @@ import { FileService } from './file.service';
 import { ApiTags } from '@nestjs/swagger';
 import { FileType } from '@prisma/client';
 import { PaginatedDto } from '@Common';
+import { I18nLang } from 'nestjs-i18n';
 
 @ApiTags('Files')
 @Controller('files')
@@ -33,9 +34,26 @@ export class FileController {
       take: pagination.take ?? 20,
     });
   }
+
+  @Get('category/:id')
+  getByCategory(
+    @Param('id', ParseIntPipe) id: number,
+    @I18nLang() lang: string,
+    @Query() pagination: PaginatedDto,
+    @Query('type') type?: FileType,
+  ) {
+    return this.fileService.getFilesByCategory(id, {
+      skip: pagination.skip,
+      take: pagination.take,
+      type,
+      lang,
+    });
+  }
+
   @Get('subcategory/:id')
   getBySubcategory(
     @Param('id', ParseIntPipe) id: number,
+    @I18nLang() lang: string,
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
   ) {
@@ -43,6 +61,7 @@ export class FileController {
       skip: pagination.skip,
       take: pagination.take,
       type,
+      lang,
     });
   }
 
