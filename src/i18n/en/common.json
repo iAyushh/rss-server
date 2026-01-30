@@ -1,0 +1,19 @@
+{
+    "errors": {
+        "CATEGORY_ALREADY_EXISTS": "Category already exists",
+        "CATEGORY_NOT_FOUND": "Category not found",
+        "SUBCATEGORY_ALREADY_EXISTS": "Subcategory already exists",
+        "SUBCATEGORY_NOT_FOUND": "Subcategory not found",
+        "HINDI_TRANSLATION_REQUIRED": "Hindi translation is mandatory",
+        "CATEGORY_HAS_SUBCATEGORIES": "This category contains subcategories. Please delete them first."
+    },
+    "success": {
+        "CATEGORY_CREATED": "Category created successfully",
+        "CATEGORY_DELETED": "Category deleted successfully",
+        "SUBCATEGORY_CREATED": "Subcategory created successfully",
+        "SUBCATEGORY_DELETED": "Subcategory deleted successfully",
+        "CATEGORY_UPDATED": "Category updated successfully",
+        "SUBCATEGORY_UPDATED": "Subcategory updated successfully",
+        "CONTENT_UPDATED": "Content updated"
+    }
+}
