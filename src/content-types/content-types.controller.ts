@@ -7,10 +7,21 @@ import {
   Param,
   Patch,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ContentTypeService } from './content-types.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
 import { I18nLang } from 'nestjs-i18n';
+import {
+  AccessGuard,
+  JwtAuthGuard,
+  Roles,
+  RolesGuard,
+  UserType,
+} from '@Common';
+
+@Roles(UserType.Admin)
+@UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('content-types')
 export class ContentTypeController {
   constructor(private readonly contentTypeService: ContentTypeService) {}

@@ -5,14 +5,24 @@ import {
   Param,
   ParseIntPipe,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { FileService } from './file.service';
 import { ApiTags } from '@nestjs/swagger';
 import { FileType } from '@prisma/client';
-import { PaginatedDto } from '@Common';
+import {
+  AccessGuard,
+  JwtAuthGuard,
+  PaginatedDto,
+  Roles,
+  RolesGuard,
+  UserType,
+} from '@Common';
 import { I18nLang } from 'nestjs-i18n';
 
 @ApiTags('Files')
+@Roles(UserType.Admin)
+@UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
   constructor(private readonly fileService: FileService) {}

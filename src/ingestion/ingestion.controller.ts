@@ -3,14 +3,24 @@ import {
   Controller,
   Post,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { IngestionService } from './ingestion.service';
 import { IngestionDto } from './dto/ingestion.dto';
 import { StorageFilesInterceptor } from 'src/common/interceptors';
+import {
+  AccessGuard,
+  JwtAuthGuard,
+  Roles,
+  RolesGuard,
+  UserType,
+} from '@Common';
 
 @ApiTags('Ingestion')
+@Roles(UserType.Admin)
+@UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('ingestion')
 export class IngestionController {
   constructor(private readonly ingestionService: IngestionService) {}
