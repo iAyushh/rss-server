@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, FileType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
 type NormalizedFileInput = {
   displayName: string;
   description?: string;
-  originalName?: string;
+  originalName: string;
   storageKey: string;
   mimeType: string;
   extension: string;
@@ -32,17 +32,13 @@ export class FileService {
       id: file.id,
       contentTypeId: file.contentTypeId,
       displayName: file.displayName,
-      originalName: file.originalName,
       description: file.description,
+      originalName: file.originalName,
       fileSize: file.fileSize,
       fileType: file.fileType,
       uploadedAt: file.uploadedAt,
       url: this.getPublicUrl(file.storageKey),
-      metadata: Object.fromEntries(
-        file.metadata
-          .filter((m) => ['category', 'subcategory', 'tag'].includes(m.key))
-          .map((m) => [m.key, m.value]),
-      ),
+      metadata: Object.fromEntries(file.metadata.map((m) => [m.key, m.value])),
     };
   }
 
@@ -52,7 +48,7 @@ export class FileService {
     files: NormalizedFileInput[],
     metadata?: Record<string, string>,
   ) {
-    const assets = [];
+    const assets: FileWithMetadata[] = [];
 
     for (const file of files) {
       const asset = await tx.fileAsset.create({
@@ -70,8 +66,6 @@ export class FileService {
         include: { metadata: true },
       });
 
-      assets.push(asset);
-
       if (metadata) {
         await tx.fileMetadata.createMany({
           data: Object.entries(metadata).map(([key, value]) => ({
@@ -81,9 +75,27 @@ export class FileService {
           })),
         });
       }
+
+      assets.push(asset);
     }
 
     return assets;
+  }
+
+  async deleteFile(id: number) {
+    const file = await this.prisma.fileAsset.findUnique({ where: { id } });
+    if (!file) throw new NotFoundException('File not found');
+
+    await this.prisma.$transaction([
+      this.prisma.fileMetadata.deleteMany({ where: { fileId: id } }),
+      this.prisma.fileAsset.delete({ where: { id } }),
+    ]);
+
+    await fs
+      .unlink(path.join(process.cwd(), 'uploads', file.storageKey))
+      .catch(() => {});
+
+    return { success: true, deletedId: id };
   }
 
   async getFilesByContentType(contentTypeId: number) {
@@ -229,30 +241,6 @@ export class FileService {
     return {
       files: files.map((f) => this.formatFile(f)),
       total: files.length,
-    };
-  }
-
-  async deleteFile(id: number) {
-    const file = await this.prisma.fileAsset.findUnique({
-      where: { id },
-    });
-
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.fileMetadata.deleteMany({ where: { fileId: id } });
-      await tx.fileAsset.delete({ where: { id } });
-    });
-
-    await fs
-      .unlink(path.join(process.cwd(), 'uploads', file.storageKey))
-      .catch(() => {});
-
-    return {
-      success: true,
-      deletedId: id,
     };
   }
 }
