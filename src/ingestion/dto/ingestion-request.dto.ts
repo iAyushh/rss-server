@@ -1,7 +1,9 @@
 import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { FileType } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class IngestionDto {
+  @Type(() => Number)
   @IsInt()
   contentTypeId: number;
 
@@ -14,4 +16,12 @@ export class IngestionDto {
   @IsOptional()
   @IsString()
   metadata?: string;
+
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

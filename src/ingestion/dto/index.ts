@@ -1,1 +1,1 @@
-export * from './ingestion.dto';
+export * from './ingestion-request.dto';

@@ -103,7 +103,6 @@ export class ContentTypeService {
           categorySlug: content.category.slug,
           subcategorySlug: content.subcategory?.slug ?? null,
           contentYear: content.contentYear,
-          status: content.status,
           lang: translation.languageCode,
           name: translation.name,
           description: translation.description,
@@ -132,7 +131,6 @@ export class ContentTypeService {
         where: { id },
         data: {
           contentYear: dto.contentYear ?? undefined,
-          status: dto.status ?? undefined,
         },
       });
 

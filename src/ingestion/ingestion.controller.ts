@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { IngestionService } from './ingestion.service';
-import { IngestionDto } from './dto/ingestion.dto';
+import { IngestionDto } from './dto';
 import { StorageFilesInterceptor } from 'src/common/interceptors';
 import {
   AccessGuard,
@@ -36,7 +36,17 @@ export class IngestionController {
         contentYear: { type: 'number', example: 2024 },
         type: {
           type: 'string',
-          enum: ['IMAGE', 'PDF', 'WORD', 'TEXT', 'CSV', 'EXCEL', 'OTHER'],
+          enum: [
+            'IMAGE',
+            'PDF',
+            'WORD',
+            'TEXT',
+            'CSV',
+            'EXCEL',
+            'AUDIO',
+            'VIDEO',
+            'OTHER',
+          ],
         },
         metadata: {
           type: 'string',

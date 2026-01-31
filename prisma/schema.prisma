@@ -219,12 +219,8 @@ enum FileType {
   AUDIO
   VIDEO
   OTHER
-}
 
-enum ContentStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
+  @@map("file_type")
 }
 
 model ContentType {
@@ -233,8 +229,7 @@ model ContentType {
   categoryId    Int  @map("category_id")
   subcategoryId Int? @map("subcategory_id")
 
-  contentYear Int           @map("content_year") // logical year (NOT upload year)
-  status      ContentStatus @default(DRAFT)
+  contentYear Int @map("content_year") // logical year (NOT upload year)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -266,12 +261,17 @@ model ContentTypeTranslation {
 }
 
 model FileAsset {
-  id         Int      @id @default(autoincrement())
-  fileName   String   @map("file_name")
-  fileSize   Int      @map("file_size")
-  mimeType   String   @map("mime_type")
-  storageKey String   @map("storage_key")
-  fileType   FileType @map("file_type")
+  id           Int     @id @default(autoincrement())
+  displayName  String  @map("display_name")
+  description  String?
+  originalName String? @map("original_name")
+
+  storageKey String @unique @map("storage_key")
+  fileSize   Int    @map("file_size")
+  mimeType   String @map("mime_type")
+  extension  String
+
+  fileType FileType @map("file_type")
 
   uploadedAt DateTime @default(now()) @map("uploaded_at")
 
