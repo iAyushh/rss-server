@@ -7,11 +7,15 @@ export class IngestionDto {
   @IsInt()
   contentTypeId: number;
 
+  @Type(() => Number)
   @IsInt()
   contentYear: number;
 
   @IsEnum(FileType)
   type: FileType;
+
+  @IsString()
+  lang: string;
 
   @IsOptional()
   @IsString()
@@ -24,4 +28,14 @@ export class IngestionDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  categoryId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  subcategoryId?: number;
 }

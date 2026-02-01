@@ -28,20 +28,26 @@ export class FileController {
   constructor(private readonly fileService: FileService) {}
 
   @Get('content-types/:id')
-  async getFilesByContentType(@Param('id', ParseIntPipe) id: number) {
-    return this.fileService.getFilesByContentType(id);
+  async getFilesByContentType(
+    @Param('id', ParseIntPipe) id: number,
+    @I18nLang() lang: string,
+  ) {
+    return this.fileService.getFilesByContentType(id, lang);
   }
   @Get()
   getAll(
-    @Query() pagination: PaginatedDto,
     @Query('contentTypeId') contentTypeId?: number,
     @Query('type') type?: FileType,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('lang') lang = 'hi',
   ) {
     return this.fileService.getAllFiles({
-      contentTypeId,
+      contentTypeId: contentTypeId ? Number(contentTypeId) : undefined,
       type,
-      skip: pagination.skip ?? 0,
-      take: pagination.take ?? 20,
+      skip: skip ? Number(skip) : 0,
+      take: take ? Number(take) : 20,
+      lang,
     });
   }
 

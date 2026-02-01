@@ -262,8 +262,6 @@ model ContentTypeTranslation {
 
 model FileAsset {
   id           Int     @id @default(autoincrement())
-  displayName  String  @map("display_name")
-  description  String?
   originalName String? @map("original_name")
 
   storageKey String @unique @map("storage_key")
@@ -271,18 +269,34 @@ model FileAsset {
   mimeType   String @map("mime_type")
   extension  String
 
-  fileType FileType @map("file_type")
+  fileType FileType
 
   uploadedAt DateTime @default(now()) @map("uploaded_at")
 
   contentTypeId Int         @map("content_type_id")
   contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
 
-  metadata FileMetadata[]
+  translations FileTranslation[]
+  metadata     FileMetadata[]
 
   @@index([fileType])
   @@index([contentTypeId])
   @@map("file_asset")
+}
+
+model FileTranslation {
+  id           Int    @id @default(autoincrement())
+  fileId       Int    @map("file_id")
+  languageCode String @map("language_code")
+
+  displayName String
+  description String?
+
+  file FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, languageCode])
+  @@index([languageCode])
+  @@map("file_translation")
 }
 
 model FileMetadata {
