@@ -1,10 +1,12 @@
 import {
   Controller,
   Delete,
+  Patch,
   Get,
   Param,
   ParseIntPipe,
   Query,
+  Body,
   UseGuards,
 } from '@nestjs/common';
 import { FileService } from './file.service';
@@ -19,6 +21,7 @@ import {
   UserType,
 } from '@Common';
 import { I18nLang } from 'nestjs-i18n';
+import { UpdateFileRequestDto } from './dto';
 
 @ApiTags('Files')
 @Roles(UserType.Admin)
@@ -79,6 +82,14 @@ export class FileController {
       type,
       lang,
     });
+  }
+
+  @Patch(':id')
+  updateFile(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateFileRequestDto,
+  ) {
+    return this.fileService.update(id, dto);
   }
 
   @Delete(':id')

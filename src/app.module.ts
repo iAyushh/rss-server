@@ -16,6 +16,7 @@ import { I18nModule, QueryResolver } from 'nestjs-i18n';
 import { SubcategoriesModule } from './subcategories/subcategories.module';
 import { ContentTypesModule } from './content-types/content-types.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { FileModule } from './file/file.module';
 
 const redisEnabled = process.env.REDIS_ENABLED === 'true';
 
@@ -55,6 +56,7 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
     SubcategoriesModule,
     ContentTypesModule,
     IngestionModule,
+    FileModule,
   ],
   controllers: [AppController],
   providers: [

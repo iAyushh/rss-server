@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { I18nService } from 'nestjs-i18n';
+import { UpdateFileRequestDto } from './dto';
 
 type FileWithRelations = Prisma.FileAssetGetPayload<{
   include: {
@@ -235,6 +236,44 @@ export class FileService {
     return {
       files: files.map((f) => this.formatFile(f, lang)),
       total: files.length,
+    };
+  }
+
+  async update(fileId: number, dto: UpdateFileRequestDto) {
+    const file = await this.prisma.fileAsset.findUnique({
+      where: { id: fileId },
+    });
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (dto.translations?.length) {
+      await this.prisma.$transaction(
+        dto.translations.map((t) =>
+          this.prisma.fileTranslation.upsert({
+            where: {
+              fileId_languageCode: {
+                fileId,
+                languageCode: t.languageCode,
+              },
+            },
+            update: {
+              displayName: t.displayName,
+              description: t.description ?? null,
+            },
+            create: {
+              fileId,
+              languageCode: t.languageCode,
+              displayName: t.displayName,
+              description: t.description ?? null,
+            },
+          }),
+        ),
+      );
+    }
+    return {
+      success: true,
+      fileId,
     };
   }
 
