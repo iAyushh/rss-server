@@ -118,55 +118,20 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    let translation = await this.prisma.categoryTranslation.findFirst({
-      where: {
-        categoryId,
-        languageCode: lang,
-      },
-      select: { name: true },
-    });
-    if (!translation) {
-      translation = await this.prisma.categoryTranslation.findFirst({
-        where: {
-          categoryId,
-          languageCode: 'hi',
-        },
-        select: {
-          name: true,
-        },
-      });
-    }
-
-    if (!translation) {
-      return { files: [], total: 0 };
-    }
-
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
-
         metadata: {
           some: {
             key: 'category',
-            value: translation.name,
+            value: String(categoryId), // ✅ ID based
           },
         },
-
-        // subcategory NOT present (direct uploads)
-        AND: [
-          {
-            metadata: {
-              none: {
-                key: 'subcategory',
-                value: {
-                  not: '',
-                },
-              },
-            },
-          },
-        ],
       },
-      include: { metadata: true, translations: true },
+      include: {
+        metadata: true,
+        translations: true,
+      },
       orderBy: { uploadedAt: 'desc' },
       skip,
       take,
@@ -177,7 +142,6 @@ export class FileService {
       total: files.length,
     };
   }
-
   async getFilesBySubcategory(
     subcategoryId: number,
     params?: {
@@ -189,45 +153,20 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    let translation = await this.prisma.subcategoryTranslation.findFirst({
-      where: {
-        subcategoryId,
-        languageCode: lang,
-      },
-      select: {
-        name: true,
-      },
-    });
-
-    if (!translation) {
-      translation = await this.prisma.subcategoryTranslation.findFirst({
-        where: {
-          subcategoryId,
-          languageCode: 'hi',
-        },
-        select: {
-          name: true,
-        },
-      });
-    }
-    if (!translation) {
-      return {
-        files: [],
-        total: 0,
-      };
-    }
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
-
         metadata: {
           some: {
             key: 'subcategory',
-            value: translation.name,
+            value: String(subcategoryId), // ✅ ID based
           },
         },
       },
-      include: { metadata: true, translations: true },
+      include: {
+        metadata: true,
+        translations: true,
+      },
       orderBy: { uploadedAt: 'desc' },
       skip,
       take,

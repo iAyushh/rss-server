@@ -57,10 +57,13 @@ export class FileController {
   @Get('category/:id')
   getByCategory(
     @Param('id', ParseIntPipe) id: number,
-    @I18nLang() lang: string,
+    @Query('lang') queryLang: string,
+    @I18nLang() i18nLang: string,
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
   ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+
     return this.fileService.getFilesByCategory(id, {
       skip: pagination.skip,
       take: pagination.take,
@@ -72,10 +75,13 @@ export class FileController {
   @Get('subcategory/:id')
   getBySubcategory(
     @Param('id', ParseIntPipe) id: number,
-    @I18nLang() lang: string,
+    @Query('lang') queryLang: string,
+    @I18nLang() i18nLang: string,
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
   ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+
     return this.fileService.getFilesBySubcategory(id, {
       skip: pagination.skip,
       take: pagination.take,
