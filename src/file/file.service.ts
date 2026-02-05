@@ -166,33 +166,26 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    // 1️⃣ subcategory ka translated NAME nikalo
-    const subcategoryTranslation =
-      (await this.prisma.subcategoryTranslation.findFirst({
-        where: {
-          subcategoryId,
-          languageCode: lang,
-        },
-      })) ??
-      (await this.prisma.subcategoryTranslation.findFirst({
-        where: {
-          subcategoryId,
-          languageCode: 'hi',
-        },
-      }));
+    // 1️⃣ saari translations lao (en + hi)
+    const translations = await this.prisma.subcategoryTranslation.findMany({
+      where: { subcategoryId },
+      select: { name: true },
+    });
 
-    if (!subcategoryTranslation) {
+    if (!translations.length) {
       return { files: [], total: 0 };
     }
 
-    // 2️⃣ NAME-based metadata match
+    const names = translations.map((t) => t.name);
+
+    // 2️⃣ OR based metadata match
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
         metadata: {
           some: {
             key: 'subcategory',
-            value: subcategoryTranslation.name, // ✅ STRING MATCH
+            value: { in: names }, // ✅ MAGIC FIX
           },
         },
       },
