@@ -106,7 +106,6 @@ export class FileService {
       total,
     };
   }
-
   async getFilesByCategory(
     categoryId: number,
     params?: {
@@ -118,13 +117,27 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
+    // 1️⃣ category ka translated NAME nikalo
+    const categoryTranslation =
+      (await this.prisma.categoryTranslation.findFirst({
+        where: { categoryId, languageCode: lang },
+      })) ??
+      (await this.prisma.categoryTranslation.findFirst({
+        where: { categoryId, languageCode: 'hi' },
+      }));
+
+    if (!categoryTranslation) {
+      return { files: [], total: 0 };
+    }
+
+    // 2️⃣ NAME se file_metadata match karo
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
         metadata: {
           some: {
             key: 'category',
-            value: String(categoryId), // ✅ ID based
+            value: categoryTranslation.name, // ✅ STRING MATCH
           },
         },
       },
@@ -153,13 +166,33 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
+    // 1️⃣ subcategory ka translated NAME nikalo
+    const subcategoryTranslation =
+      (await this.prisma.subcategoryTranslation.findFirst({
+        where: {
+          subcategoryId,
+          languageCode: lang,
+        },
+      })) ??
+      (await this.prisma.subcategoryTranslation.findFirst({
+        where: {
+          subcategoryId,
+          languageCode: 'hi',
+        },
+      }));
+
+    if (!subcategoryTranslation) {
+      return { files: [], total: 0 };
+    }
+
+    // 2️⃣ NAME-based metadata match
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
         metadata: {
           some: {
             key: 'subcategory',
-            value: String(subcategoryId), // ✅ ID based
+            value: subcategoryTranslation.name, // ✅ STRING MATCH
           },
         },
       },
