@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
 import { I18nService } from 'nestjs-i18n';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import slugify from 'slugify';
 
 @Injectable()
 export class ContentTypeService {
@@ -47,11 +48,21 @@ export class ContentTypeService {
 
     // 3. Transactional create
     const content = await this.prisma.$transaction(async (tx) => {
+      const baseName = dto.translations?.[0]?.name || 'content';
+
+      const generatedSlug = slugify(baseName, {
+        lower: true,
+        strict: true,
+      });
+
+      const contentYear = dto.contentYear ?? new Date().getFullYear();
       return tx.contentType.create({
         data: {
+          slug: generatedSlug,
+
           categoryId: dto.categoryId,
           subcategoryId: dto.subcategoryId,
-          contentYear: dto.contentYear ?? new Date().getFullYear(),
+          contentYear,
           translations: {
             create: dto.translations,
           },

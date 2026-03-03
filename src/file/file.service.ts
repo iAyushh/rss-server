@@ -166,7 +166,6 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    // 1️⃣ saari translations lao (en + hi)
     const translations = await this.prisma.subcategoryTranslation.findMany({
       where: { subcategoryId },
       select: { name: true },
@@ -178,14 +177,13 @@ export class FileService {
 
     const names = translations.map((t) => t.name);
 
-    // 2️⃣ OR based metadata match
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
         metadata: {
           some: {
             key: 'subcategory',
-            value: { in: names }, // ✅ MAGIC FIX
+            value: { in: names },
           },
         },
       },

@@ -17,6 +17,7 @@ import { SubcategoriesModule } from './subcategories/subcategories.module';
 import { ContentTypesModule } from './content-types/content-types.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { FileModule } from './file/file.module';
+import { SearchModule } from './search/search.module';
 
 const redisEnabled = process.env.REDIS_ENABLED === 'true';
 
@@ -57,6 +58,7 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
     ContentTypesModule,
     IngestionModule,
     FileModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [
