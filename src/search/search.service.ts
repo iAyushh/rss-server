@@ -6,8 +6,6 @@ export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
   async globalSearch(query: string, languageCode: string, skip = 0, take = 20) {
-    console.log('RUNNING GLOBAL SEARCH');
-    console.log('SEARCH PARAMS:', query, languageCode);
     if (!query || !query.trim()) {
       return [];
     }
