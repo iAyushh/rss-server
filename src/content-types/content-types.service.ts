@@ -72,7 +72,20 @@ export class ContentTypeService {
         },
       });
     });
-
+    await this.prisma.$executeRaw`
+UPDATE content_type ct
+SET search_vector =
+  to_tsvector(
+    'simple',
+    COALESCE(
+      (SELECT string_agg(ctt.name, ' ')
+       FROM content_type_translation ctt
+       WHERE ctt.content_type_id = ct.id),
+      ''
+    )
+  )
+WHERE ct.id = ${content.id};
+`;
     await this.invalidateCache();
 
     return content;

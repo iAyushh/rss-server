@@ -10,6 +10,7 @@ export class SearchController {
   async globalSearch(@Query() dto: SearchablePaginatedDto) {
     return this.searchService.globalSearch(
       dto.search ?? '',
+      dto.languageCode ?? 'en',
       dto.skip ?? 0,
       dto.take ?? 20,
     );

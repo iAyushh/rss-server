@@ -117,7 +117,6 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    // 1️⃣ category ka translated NAME nikalo
     const categoryTranslation =
       (await this.prisma.categoryTranslation.findFirst({
         where: { categoryId, languageCode: lang },
@@ -130,14 +129,13 @@ export class FileService {
       return { files: [], total: 0 };
     }
 
-    // 2️⃣ NAME se file_metadata match karo
     const files = await this.prisma.fileAsset.findMany({
       where: {
         ...(type && { fileType: type }),
         metadata: {
           some: {
             key: 'category',
-            value: categoryTranslation.name, // ✅ STRING MATCH
+            value: categoryTranslation.name,
           },
         },
       },

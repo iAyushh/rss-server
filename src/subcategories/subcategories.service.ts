@@ -81,6 +81,21 @@ export class SubcategoriesService {
       },
     });
 
+    await this.prisma.$executeRaw`
+UPDATE subcategory s
+SET search_vector =
+  to_tsvector(
+    'simple',
+    COALESCE(
+      (SELECT string_agg(st.name, ' ')
+       FROM subcategory_translation st
+       WHERE st.subcategory_id = s.id),
+      ''
+    )
+  )
+WHERE s.id = ${subcategory.id};
+`;
+
     await this.invalidateCache(dto.categoryId);
     return subcategory;
   }

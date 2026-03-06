@@ -5,85 +5,125 @@ import { PrismaService } from 'src/prisma';
 export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async globalSearch(query: string, skip = 0, take = 20) {
+  async globalSearch(query: string, languageCode: string, skip = 0, take = 20) {
+    console.log('RUNNING GLOBAL SEARCH');
+    console.log('SEARCH PARAMS:', query, languageCode);
     if (!query || !query.trim()) {
       return [];
     }
 
     return this.prisma.$queryRawUnsafe(
       `
-    SELECT * FROM (
+SELECT * FROM (
 
-      -- Category
-      SELECT 
-        'category' as type,
-        c.id,
-        c.slug,
-        ct.name as title,
-        ts_rank(c.search_vector, plainto_tsquery('simple', $1)) as rank
-      FROM category c
-      JOIN category_translation ct 
-        ON ct.category_id = c.id
-      WHERE 
-  c.search_vector @@ plainto_tsquery('simple', $1)
-  OR ct.name ILIKE '%' || $1 || '%'
-  OR c.slug ILIKE '%' || $1 || '%'
+  -- Category
+  SELECT 
+    'category' AS type,
+    c.id,
+    c.slug,
+    (
+      SELECT name
+      FROM category_translation
+      WHERE category_id = c.id
+      AND language_code = $2
+      LIMIT 1
+    ) AS title,
+    ts_rank(COALESCE(c.search_vector,''), plainto_tsquery('simple',$1)) AS rank
+  FROM category c
+  WHERE
+      c.search_vector @@ plainto_tsquery('simple',$1)
+      OR EXISTS (
+        SELECT 1
+        FROM category_translation ct
+        WHERE ct.category_id = c.id
+        AND ct.language_code = $2
+        AND ct.name ILIKE '%' || $1 || '%'
+      )
 
-      UNION ALL
+  UNION ALL
 
-      -- Subcategory
-      SELECT 
-        'subcategory' as type,
-        s.id,
-        s.slug,
-        st.name as title,
-        ts_rank(s.search_vector, plainto_tsquery('simple', $1)) as rank
-      FROM subcategory s
-      JOIN subcategory_translation st 
-        ON st.subcategory_id = s.id
-    WHERE 
-  s.search_vector @@ plainto_tsquery('simple', $1)
-  OR st.name ILIKE '%' || $1 || '%'
-  OR s.slug ILIKE '%' || $1 || '%'
+  -- Subcategory
+  SELECT 
+    'subcategory',
+    s.id,
+    s.slug,
+    (
+      SELECT name
+      FROM subcategory_translation
+      WHERE subcategory_id = s.id
+      AND language_code = $2
+      LIMIT 1
+    ),
+    ts_rank(COALESCE(s.search_vector,''), plainto_tsquery('simple',$1))
+  FROM subcategory s
+  WHERE
+      s.search_vector @@ plainto_tsquery('simple',$1)
+      OR EXISTS (
+        SELECT 1
+        FROM subcategory_translation st
+        WHERE st.subcategory_id = s.id
+        AND st.language_code = $2
+        AND st.name ILIKE '%' || $1 || '%'
+      )
 
-      UNION ALL
+  UNION ALL
 
-      -- ContentType
-      SELECT 
-        'content' as type,
-        ct2.id,
-        ct2.slug,
-        ctt.name as title,
-        ts_rank(ct2.search_vector, plainto_tsquery('simple', $1)) as rank
-      FROM content_type ct2
-      JOIN content_type_translation ctt 
-        ON ctt.content_type_id = ct2.id
-     WHERE 
-  ct2.search_vector @@ plainto_tsquery('simple', $1)
-  OR ctt.name ILIKE '%' || $1 || '%'
-  OR ct2.slug ILIKE '%' || $1 || '%'
+  -- ContentType
+  SELECT
+    'content',
+    ct.id,
+    ct.slug,
+    (
+      SELECT name
+      FROM content_type_translation
+      WHERE content_type_id = ct.id
+      AND language_code = $2
+      LIMIT 1
+    ),
+    ts_rank(COALESCE(ct.search_vector,''), plainto_tsquery('simple',$1))
+  FROM content_type ct
+  WHERE
+      ct.search_vector @@ plainto_tsquery('simple',$1)
+      OR EXISTS (
+        SELECT 1
+        FROM content_type_translation ctt
+        WHERE ctt.content_type_id = ct.id
+        AND ctt.language_code = $2
+        AND ctt.name ILIKE '%' || $1 || '%'
+      )
 
-      UNION ALL
+  UNION ALL
 
-      -- FileAsset
-      SELECT 
-        'file' as type,
-        f.id,
-        NULL as slug,
-        ft."displayName" as title,
-        ts_rank(f.search_vector, plainto_tsquery('simple', $1)) as rank
-      FROM file_asset f
-      JOIN file_translation ft 
-        ON ft.file_id = f.id
-      WHERE 
-  f.search_vector @@ plainto_tsquery('simple', $1)
-  OR ft."displayName" ILIKE '%' || $1 || '%'
+  -- FileAsset
+  SELECT
+    'file',
+    f.id,
+    NULL,
+    (
+      SELECT "displayName"
+      FROM file_translation
+      WHERE file_id = f.id
+      AND language_code = $2
+      LIMIT 1
+    ),
+    ts_rank(COALESCE(f.search_vector,''), plainto_tsquery('simple',$1))
+  FROM file_asset f
+  WHERE
+      f.search_vector @@ plainto_tsquery('simple',$1)
+      OR EXISTS (
+        SELECT 1
+        FROM file_translation ft
+        WHERE ft.file_id = f.id
+        AND ft.language_code = $2
+        AND ft."displayName" ILIKE '%' || $1 || '%'
+      )
 
-    ) results
-    ORDER BY rank DESC
-    LIMIT $2 OFFSET $3
-    `,
+) results
+ORDER BY rank DESC
+LIMIT $3 OFFSET $4
+`,
       query,
+      languageCode,
       take,
       skip,
     );

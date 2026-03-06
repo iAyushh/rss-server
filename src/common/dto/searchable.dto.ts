@@ -1,17 +1,19 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
-import { PaginatedDto } from './paginated.dto';
+import { IsOptional, IsString, IsNumber } from 'class-validator';
 
-export class SearchableDto {
-  @ApiPropertyOptional()
+export class SearchablePaginatedDto {
   @IsOptional()
   @IsString()
   search?: string;
-}
 
-export class SearchablePaginatedDto extends PaginatedDto {
-  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  search?: string;
+  languageCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  skip?: number;
+
+  @IsOptional()
+  @IsNumber()
+  take?: number;
 }

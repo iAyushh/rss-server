@@ -63,6 +63,21 @@ export class CategoryService {
       },
     });
 
+    await this.prisma.$executeRaw`
+UPDATE category c
+SET search_vector =
+  to_tsvector(
+    'simple',
+    COALESCE(
+      (SELECT string_agg(ct.name, ' ')
+       FROM category_translation ct
+       WHERE ct.category_id = c.id),
+      ''
+    )
+  )
+WHERE c.id = ${category.id};
+`;
+
     await this.invalidateCache();
     return category;
   }
