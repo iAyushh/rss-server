@@ -100,19 +100,24 @@ WHERE s.id = ${subcategory.id};
     return subcategory;
   }
 
-  async findByCategory(categoryId: number, lang: string) {
+  async findByCategory(categoryId: number, lang: string, skip = 0, take = 10) {
     const cacheKey = `subcategories:${categoryId}:${lang}`;
 
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
-    const subcategories = await this.prisma.subcategory.findMany({
-      where: { categoryId },
-      include: {
-        translations: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [subcategories, total] = await Promise.all([
+      this.prisma.subcategory.findMany({
+        where: { categoryId },
+        include: { translations: true },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take,
+      }),
+      this.prisma.subcategory.count({
+        where: { categoryId },
+      }),
+    ]);
 
     const result = subcategories.map((sub) => {
       let translation = sub.translations.find(
@@ -139,7 +144,7 @@ WHERE s.id = ${subcategory.id};
       };
     });
     await this.cache.set(cacheKey, result, 600);
-    return result;
+    return { result, total };
   }
 
   async update(id: number, dto: UpdateSubcategoryRequestDto, lang: string) {
@@ -181,6 +186,20 @@ WHERE s.id = ${subcategory.id};
         );
       });
     }
+    await this.prisma.$executeRaw`
+UPDATE subcategory s
+SET search_vector =
+  to_tsvector(
+    'simple',
+    COALESCE(
+      (SELECT string_agg(st.name, ' ')
+       FROM subcategory_translation st
+       WHERE st.subcategory_id = s.id),
+      ''
+    )
+  )
+WHERE s.id = ${id};
+`;
 
     await this.invalidateCache(subcategory.categoryId);
 

@@ -7,6 +7,7 @@ import {
   Post,
   Patch,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { CategoryService } from './categories.service';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
@@ -29,8 +30,16 @@ export class CategoryController {
   }
 
   @Get()
-  findAll(@I18nLang() lang: string) {
-    return this.categoryService.findAll(lang);
+  findAll(
+    @I18nLang() lang: string,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+  ) {
+    return this.categoryService.findAll(
+      lang,
+      skip ? Number(skip) : 0,
+      take ? Number(take) : 20,
+    );
   }
 
   @Patch(':id')

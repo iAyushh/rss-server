@@ -7,6 +7,7 @@ import {
   Post,
   Patch,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { I18nLang } from 'nestjs-i18n';
 import { SubcategoriesService } from './subcategories.service';
@@ -35,8 +36,15 @@ export class SubcategoriesController {
   findByCategory(
     @Param('categoryId') categoryId: string,
     @I18nLang() lang: string,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
   ) {
-    return this.subcategoriesService.findByCategory(Number(categoryId), lang);
+    return this.subcategoriesService.findByCategory(
+      Number(categoryId),
+      lang,
+      skip ? Number(skip) : 0,
+      take ? Number(take) : 10,
+    );
   }
   @Patch(':id')
   update(

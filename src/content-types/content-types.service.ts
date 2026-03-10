@@ -91,25 +91,40 @@ WHERE ct.id = ${content.id};
     return content;
   }
 
-  async findAll(lang: string, categoryId?: number, subcategoryId?: number) {
+  async findAll(
+    lang: string,
+    categoryId?: number,
+    subcategoryId?: number,
+    skip = 0,
+    take = 10,
+  ) {
     const cacheKey = `content-types:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}`;
 
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
-    const contents = await this.prisma.contentType.findMany({
-      where: {
-        categoryId: categoryId ?? undefined,
-        subcategoryId: subcategoryId ?? undefined,
-      },
-      include: {
-        translations: true,
-        category: { select: { id: true, slug: true } },
-        subcategory: { select: { id: true, slug: true } },
-      },
-      orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
-    });
-
+    const [contents, total] = await Promise.all([
+      this.prisma.contentType.findMany({
+        where: {
+          categoryId: categoryId ?? undefined,
+          subcategoryId: subcategoryId ?? undefined,
+        },
+        include: {
+          translations: true,
+          category: { select: { id: true, slug: true } },
+          subcategory: { select: { id: true, slug: true } },
+        },
+        orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.contentType.count({
+        where: {
+          categoryId: categoryId ?? undefined,
+          subcategoryId: subcategoryId ?? undefined,
+        },
+      }),
+    ]);
     const result = contents
       .filter((content) => content.translations.length > 0)
       .map((content) => {
@@ -134,7 +149,158 @@ WHERE ct.id = ${content.id};
         };
       });
     await this.cache.set(cacheKey, result, 300);
-    return result;
+    return { data: result, total };
+  }
+
+  async getContentByYearSlug(
+    year: number,
+    categorySlug: string,
+    contentSlug: string,
+    lang: string,
+  ) {
+    const content = await this.prisma.contentType.findFirst({
+      where: {
+        slug: contentSlug,
+        contentYear: year,
+        category: {
+          slug: categorySlug,
+        },
+      },
+      include: {
+        translations: true,
+        category: true,
+        subcategory: true,
+        files: {
+          include: {
+            translations: true,
+            metadata: true,
+          },
+          orderBy: { uploadedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!content) {
+      throw new NotFoundException('Content not found.');
+    }
+
+    const translation =
+      content.translations.find((t) => t.languageCode === lang) ??
+      (lang !== 'hi'
+        ? content.translations.find((t) => t.languageCode === 'hi')
+        : null) ??
+      content.translations[0];
+
+    return {
+      id: content.id,
+      slug: content.slug,
+      contentYear: content.contentYear,
+      categorySlug: content.category.slug,
+      subcategorySlug: content.subcategory?.slug ?? null,
+      name: translation.name,
+      description: translation.description,
+      files: content.files.map((f) => ({
+        id: f.id,
+        url: `${process.env.APP_URL}/uploads/${f.storageKey}`,
+        fileType: f.fileType,
+        uploadedAt: f.uploadedAt,
+        displayName:
+          f.translations.find((t) => t.languageCode === lang)?.displayName ??
+          f.translations.find((t) => t.languageCode === 'hi')?.displayName ??
+          f.translations[0]?.displayName ??
+          f.originalName,
+      })),
+    };
+  }
+
+  async getIndexNavigation(lang: string) {
+    const contents = await this.prisma.contentType.findMany({
+      include: {
+        translations: true,
+        category: {
+          include: {
+            translations: true,
+          },
+        },
+        subcategory: {
+          include: {
+            translations: true,
+          },
+        },
+      },
+      orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    const result: Record<number, any> = {};
+
+    for (const content of contents) {
+      const year = content.contentYear;
+
+      if (!result[year]) {
+        result[year] = {
+          year,
+          categories: {},
+        };
+      }
+
+      const category = content.category;
+      const categoryTranslation =
+        category.translations.find((t) => t.languageCode === lang) ??
+        category.translations.find((t) => t.languageCode === 'hi') ??
+        category.translations[0];
+
+      if (!result[year].categories[category.slug]) {
+        result[year].categories[category.slug] = {
+          slug: category.slug,
+          name: categoryTranslation.name,
+          subcategories: {},
+        };
+      }
+
+      const subcategory = content.subcategory;
+
+      if (subcategory) {
+        const subTranslation =
+          subcategory.translations.find((t) => t.languageCode === lang) ??
+          subcategory.translations.find((t) => t.languageCode === 'hi') ??
+          subcategory.translations[0];
+
+        if (
+          !result[year].categories[category.slug].subcategories[
+            subcategory.slug
+          ]
+        ) {
+          result[year].categories[category.slug].subcategories[
+            subcategory.slug
+          ] = {
+            slug: subcategory.slug,
+            name: subTranslation.name,
+            contents: [],
+          };
+        }
+
+        const translation =
+          content.translations.find((t) => t.languageCode === lang) ??
+          content.translations.find((t) => t.languageCode === 'hi') ??
+          content.translations[0];
+
+        result[year].categories[category.slug].subcategories[
+          subcategory.slug
+        ].contents.push({
+          slug: content.slug,
+          name: translation.name,
+        });
+      }
+    }
+
+    return Object.values(result).map((yearBlock: any) => ({
+      year: yearBlock.year,
+      categories: Object.values(yearBlock.categories).map((cat: any) => ({
+        slug: cat.slug,
+        name: cat.name,
+        subcategories: Object.values(cat.subcategories),
+      })),
+    }));
   }
 
   //Update
@@ -183,6 +349,20 @@ WHERE ct.id = ${content.id};
         );
       }
     });
+    await this.prisma.$executeRaw`
+UPDATE content_type ct
+SET search_vector =
+  to_tsvector(
+    'simple',
+    COALESCE(
+      (SELECT string_agg(ctt.name, ' ')
+       FROM content_type_translation ctt
+       WHERE ctt.content_type_id = ct.id),
+      ''
+    )
+  )
+WHERE ct.id = ${id};
+`;
 
     await this.invalidateCache();
 

@@ -81,20 +81,24 @@ WHERE c.id = ${category.id};
     await this.invalidateCache();
     return category;
   }
-  async findAll(lang: string) {
+
+  async findAll(lang: string, skip = 0, take = 20) {
     const cacheKey = `categories:${lang}`;
 
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
-    const categories = await this.prisma.category.findMany({
-      include: {
-        translations: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [categories, total] = await Promise.all([
+      this.prisma.category.findMany({
+        include: { translations: true },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take,
+      }),
+      this.prisma.category.count(),
+    ]);
 
-    const result = categories.map((cat) => {
+    const data = categories.map((cat) => {
       let translation = cat.translations.find(
         (t: CategoryTranslation) => t.languageCode === lang,
       );
@@ -115,6 +119,7 @@ WHERE c.id = ${category.id};
         description: translation.description,
       };
     });
+    const result = { data, total };
     await this.cache.set(cacheKey, result, 600);
     return result;
   }
@@ -154,6 +159,20 @@ WHERE c.id = ${category.id};
         ),
       );
     }
+    await this.prisma.$executeRaw`
+  UPDATE category c
+  SET search_vector =
+    to_tsvector(
+      'simple',
+      COALESCE(
+        (SELECT string_agg(ct.name, ' ')
+         FROM category_translation ct
+         WHERE ct.category_id = c.id),
+        ''
+      )
+    )
+  WHERE c.id = ${id};
+  `;
 
     await this.invalidateCache();
 

@@ -1,17 +1,24 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma';
 
 @Injectable()
 export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async globalSearch(query: string, languageCode: string, skip = 0, take = 20) {
+  async globalSearch(
+    query: string,
+    languageCode: string,
+    skip = 0,
+    take = 20,
+    year?: number,
+  ) {
     if (!query || !query.trim()) {
       return [];
     }
 
-    return this.prisma.$queryRawUnsafe(
-      `
+    return this.prisma.$queryRaw(
+      Prisma.sql`
 SELECT * FROM (
 
   -- Category
@@ -79,8 +86,10 @@ SELECT * FROM (
       LIMIT 1
     ),
     ts_rank(COALESCE(ct.search_vector,''), plainto_tsquery('simple',$1))
-  FROM content_type ct
-  WHERE
+ FROM content_type ct
+WHERE
+      ($5::int IS NULL OR ct.content_year = $5)
+  AND (
       ct.search_vector @@ plainto_tsquery('simple',$1)
       OR EXISTS (
         SELECT 1
@@ -89,6 +98,7 @@ SELECT * FROM (
         AND ctt.language_code = $2
         AND ctt.name ILIKE '%' || $1 || '%'
       )
+  )
 
   UNION ALL
 
@@ -105,8 +115,10 @@ SELECT * FROM (
       LIMIT 1
     ),
     ts_rank(COALESCE(f.search_vector,''), plainto_tsquery('simple',$1))
-  FROM file_asset f
-  WHERE
+ FROM file_asset f
+WHERE
+      ($5::int IS NULL OR f.content_year = $5)
+  AND (
       f.search_vector @@ plainto_tsquery('simple',$1)
       OR EXISTS (
         SELECT 1
@@ -115,6 +127,7 @@ SELECT * FROM (
         AND ft.language_code = $2
         AND ft."displayName" ILIKE '%' || $1 || '%'
       )
+  )
 
 ) results
 ORDER BY rank DESC
@@ -124,6 +137,7 @@ LIMIT $3 OFFSET $4
       languageCode,
       take,
       skip,
+      year ?? null,
     );
   }
 }

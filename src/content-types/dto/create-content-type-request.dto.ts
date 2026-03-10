@@ -4,7 +4,7 @@ import { ContentTypeTranslationDto } from './content-type-translation.dto';
 
 export class CreateContentTypeDto {
   @IsInt()
-  categoryId: number;
+  categoryId!: number;
 
   @IsOptional()
   @IsInt()
@@ -17,5 +17,5 @@ export class CreateContentTypeDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ContentTypeTranslationDto)
-  translations: ContentTypeTranslationDto[];
+  translations!: ContentTypeTranslationDto[];
 }

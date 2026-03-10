@@ -2,7 +2,6 @@ import { IsOptional, IsString, IsNumber } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SearchablePaginatedDto {
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -22,4 +21,9 @@ export class SearchablePaginatedDto {
   @IsOptional()
   @IsNumber()
   take?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  year?: number;
 }

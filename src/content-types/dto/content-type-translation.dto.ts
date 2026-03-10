@@ -2,10 +2,10 @@ import { IsString, IsOptional } from 'class-validator';
 
 export class ContentTypeTranslationDto {
   @IsString()
-  languageCode: string; // 'hi' | 'en'
+  languageCode!: string; // 'hi' | 'en'
 
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()

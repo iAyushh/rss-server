@@ -101,6 +101,7 @@ export class IngestionService {
             extension: file.extension,
             fileSize: file.fileSize,
             fileType: file.fileType,
+            contentYear: contentType.contentYear,
           },
         });
 

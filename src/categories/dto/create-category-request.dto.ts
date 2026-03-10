@@ -6,5 +6,5 @@ export class CreateCategoryRequestDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CategoryTranslationDto)
-  translations: CategoryTranslationDto[];
+  translations!: CategoryTranslationDto[];
 }

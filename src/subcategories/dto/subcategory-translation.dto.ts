@@ -4,12 +4,12 @@ import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 export class SubcategoryTranslationDto {
   @ApiProperty()
   @IsIn(['hi', 'en'])
-  languageCode: string;
+  languageCode!: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

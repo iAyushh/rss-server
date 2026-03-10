@@ -10,10 +10,10 @@ import { Type } from 'class-transformer';
 
 export class FileTranslationDto {
   @IsString()
-  languageCode: string;
+  languageCode!: string;
 
   @IsString()
-  displayName: string;
+  displayName!: string;
 
   @IsOptional()
   @IsString()

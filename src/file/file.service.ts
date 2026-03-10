@@ -21,7 +21,7 @@ export class FileService {
   ) {}
 
   getPublicUrl(storageKey: string) {
-    return `${process.env.APP_URL}/uploads/${storageKey}`;
+    return `${process.env.APP_URL ?? ''}/uploads/${storageKey}`;
   }
   private resolveTranslation(
     translations: FileTranslation[],
@@ -56,7 +56,9 @@ export class FileService {
 
       url: this.getPublicUrl(file.storageKey),
 
-      metadata: Object.fromEntries(file.metadata.map((m) => [m.key, m.value])),
+      metadata: Object.fromEntries(
+        (file.metadata.map ?? [])((m) => [m.key, m.value]),
+      ),
     };
   }
 
@@ -129,28 +131,35 @@ export class FileService {
       return { files: [], total: 0 };
     }
 
-    const files = await this.prisma.fileAsset.findMany({
-      where: {
-        ...(type && { fileType: type }),
-        metadata: {
-          some: {
-            key: 'category',
-            value: categoryTranslation.name,
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where: {
+          ...(type && { fileType: type }),
+          contentType: {
+            categoryId: categoryId,
           },
         },
-      },
-      include: {
-        metadata: true,
-        translations: true,
-      },
-      orderBy: { uploadedAt: 'desc' },
-      skip,
-      take,
-    });
+        include: {
+          metadata: true,
+          translations: true,
+        },
+        orderBy: { uploadedAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.fileAsset.count({
+        where: {
+          ...(type && { fileType: type }),
+          contentType: {
+            categoryId: categoryId,
+          },
+        },
+      }),
+    ]);
 
     return {
       files: files.map((f) => this.formatFile(f, lang)),
-      total: files.length,
+      total,
     };
   }
   async getFilesBySubcategory(
@@ -159,47 +168,37 @@ export class FileService {
       skip?: number;
       take?: number;
       type?: FileType;
-      lang: string;
+      lang?: string;
     },
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    const translations = await this.prisma.subcategoryTranslation.findMany({
-      where: { subcategoryId },
-      select: { name: true },
-    });
+    const where: Prisma.FileAssetWhereInput = {
+      ...(type && { fileType: type }),
+      contentType: {
+        subcategoryId,
+      },
+    };
 
-    if (!translations.length) {
-      return { files: [], total: 0 };
-    }
-
-    const names = translations.map((t) => t.name);
-
-    const files = await this.prisma.fileAsset.findMany({
-      where: {
-        ...(type && { fileType: type }),
-        metadata: {
-          some: {
-            key: 'subcategory',
-            value: { in: names },
-          },
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        include: {
+          metadata: true,
+          translations: true,
         },
-      },
-      include: {
-        metadata: true,
-        translations: true,
-      },
-      orderBy: { uploadedAt: 'desc' },
-      skip,
-      take,
-    });
+        orderBy: { uploadedAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.fileAsset.count({ where }),
+    ]);
 
     return {
       files: files.map((f) => this.formatFile(f, lang)),
-      total: files.length,
+      total,
     };
   }
-
   async update(fileId: number, dto: UpdateFileRequestDto) {
     const file = await this.prisma.fileAsset.findUnique({
       where: { id: fileId },
@@ -231,6 +230,21 @@ export class FileService {
           }),
         ),
       );
+      await this.prisma.$executeRaw`
+  UPDATE file_asset f
+  SET search_vector =
+    to_tsvector(
+      'simple',
+      COALESCE(
+        (SELECT string_agg(ft."displayName", ' ')
+         FROM file_translation ft
+         WHERE ft.file_id = f.id),
+        ''
+      )
+    )
+  
+  WHERE f.id = ${fileId};
+  `;
     }
     return {
       success: true,

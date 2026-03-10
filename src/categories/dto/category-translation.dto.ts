@@ -2,10 +2,10 @@ import { IsOptional, IsString } from 'class-validator';
 
 export class CategoryTranslationDto {
   @IsString()
-  languageCode: string;
+  languageCode!: string;
 
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()

@@ -6,11 +6,11 @@ import { SubcategoryTranslationDto } from './subcategory-translation.dto';
 export class CreateSubcategoryRequestDto {
   @ApiProperty()
   @IsInt()
-  categoryId: number;
+  categoryId!: number;
 
   @ApiProperty({ type: [SubcategoryTranslationDto] })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SubcategoryTranslationDto)
-  translations: SubcategoryTranslationDto[];
+  translations!: SubcategoryTranslationDto[];
 }

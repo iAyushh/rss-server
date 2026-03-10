@@ -287,21 +287,21 @@ model FileAsset {
   mimeType   String @map("mime_type")
   extension  String
 
-  fileType FileType
+  fileType    FileType
+  contentYear Int?     @map("content_year")
 
   uploadedAt DateTime @default(now()) @map("uploaded_at")
 
   contentTypeId Int         @map("content_type_id")
   contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
 
-
   translations FileTranslation[]
   metadata     FileMetadata[]
 
   searchVector Unsupported("tsvector")? @map("search_vector")
-  
+
   @@index([fileType])
-  @@index([contentTypeId])
+  @@index([contentYear])
   @@map("file_asset")
 }
 

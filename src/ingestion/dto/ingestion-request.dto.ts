@@ -5,17 +5,17 @@ import { Type } from 'class-transformer';
 export class IngestionDto {
   @Type(() => Number)
   @IsInt()
-  contentTypeId: number;
+  contentTypeId!: number;
 
   @Type(() => Number)
   @IsInt()
-  contentYear: number;
+  contentYear!: number;
 
   @IsEnum(FileType)
-  type: FileType;
+  type!: FileType;
 
   @IsString()
-  lang: string;
+  lang!: string;
 
   @IsOptional()
   @IsString()

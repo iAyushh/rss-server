@@ -13,6 +13,7 @@ export class SearchController {
       dto.languageCode ?? 'en',
       dto.skip ?? 0,
       dto.take ?? 20,
+      dto.year,
     );
   }
 }
