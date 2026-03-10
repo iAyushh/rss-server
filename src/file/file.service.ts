@@ -23,11 +23,12 @@ export class FileService {
   getPublicUrl(storageKey: string) {
     return `${process.env.APP_URL ?? ''}/uploads/${storageKey}`;
   }
+
   private resolveTranslation(
-    translations: FileTranslation[],
+    translations: FileTranslation[] = [],
     lang: string,
   ): FileTranslation | null {
-    if (!translations?.length) return null;
+    if (!translations.length) return null;
 
     let translation = translations.find((t) => t.languageCode === lang);
 
@@ -39,7 +40,10 @@ export class FileService {
   }
 
   private formatFile(file: FileWithRelations, lang: string) {
-    const translation = this.resolveTranslation(file.translations ?? [], lang);
+    const translations = file.translations ?? [];
+    const metadata = file.metadata ?? [];
+
+    const translation = this.resolveTranslation(translations, lang);
 
     return {
       id: file.id,
@@ -56,9 +60,7 @@ export class FileService {
 
       url: this.getPublicUrl(file.storageKey),
 
-      metadata: Object.fromEntries(
-        (file.metadata.map ?? [])((m) => [m.key, m.value]),
-      ),
+      metadata: Object.fromEntries(metadata.map((m) => [m.key, m.value])),
     };
   }
 

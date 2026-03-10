@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileService } from './file.service';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FileType } from '@prisma/client';
 import {
   AccessGuard,
@@ -23,6 +23,7 @@ import {
 import { I18nLang } from 'nestjs-i18n';
 import { UpdateFileRequestDto } from './dto';
 
+@ApiBearerAuth()
 @ApiTags('Files')
 @Roles(UserType.Admin)
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
@@ -33,10 +34,14 @@ export class FileController {
   @Get('content-types/:id')
   async getFilesByContentType(
     @Param('id', ParseIntPipe) id: number,
-    @I18nLang() lang: string,
+    @Query('lang') queryLang: string,
+    @I18nLang() i18nLang: string,
   ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+
     return this.fileService.getFilesByContentType(id, lang);
   }
+
   @Get()
   getAll(
     @Query('contentTypeId') contentTypeId?: number,
