@@ -39,7 +39,7 @@ export class FileService {
   }
 
   private formatFile(file: FileWithRelations, lang: string) {
-    const translation = this.resolveTranslation(file.translations, lang);
+    const translation = this.resolveTranslation(file.translations ?? [], lang);
 
     return {
       id: file.id,
