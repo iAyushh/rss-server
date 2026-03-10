@@ -30,12 +30,12 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 export class ContentTypeController {
   constructor(private readonly contentTypeService: ContentTypeService) {}
 
-  @Get('rss/index')
+  @Get('index')
   async getIndex(@Query('lang') lang = 'hi') {
     return this.contentTypeService.getIndexNavigation(lang);
   }
 
-  @Get('rss/:year/:categorySlug/:contentSlug')
+  @Get(':year/:categorySlug/:contentSlug')
   async getContentByYearSlug(
     @Param('year', ParseIntPipe) year: number,
     @Param('categorySlug') categorySlug: string,
