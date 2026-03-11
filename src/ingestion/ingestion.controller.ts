@@ -37,6 +37,9 @@ export class IngestionController {
         contentYear: { type: 'number', example: 2024 },
 
         lang: { type: 'string', example: 'hi' },
+        displayName: { type: 'string', example: 'Annual Report PDF' },
+
+        description: { type: 'string', example: 'Organization report' },
         type: {
           type: 'string',
           enum: [

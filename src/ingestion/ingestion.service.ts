@@ -28,6 +28,10 @@ export class IngestionService {
   }
 
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files uploaded');
+    }
+
     const contentType = await this.prisma.contentType.findUnique({
       where: { id: dto.contentTypeId },
     });
@@ -45,50 +49,32 @@ export class IngestionService {
       extension: path.extname(file.originalname),
       fileSize: file.size,
       fileType: dto.type,
-      displayName: dto.displayName ?? file.originalname,
+      displayName: dto.displayName || file.originalname,
       description: dto.description ?? null,
     }));
 
     const assets = await this.prisma.$transaction(async (tx) => {
       const lang = dto.lang ?? 'hi';
 
-      let categoryName: string | undefined;
-      let subcategoryName: string | undefined;
+      let categorySlug: string | undefined;
+      let subcategorySlug: string | undefined;
 
       if (dto.categoryId) {
-        const categoryTranslation =
-          (await tx.categoryTranslation.findFirst({
-            where: {
-              categoryId: dto.categoryId,
-              languageCode: lang,
-            },
-          })) ??
-          (await tx.categoryTranslation.findFirst({
-            where: {
-              categoryId: dto.categoryId,
-              languageCode: 'hi',
-            },
-          }));
-        categoryName = categoryTranslation?.name;
+        const category = await tx.category.findUnique({
+          where: { id: dto.categoryId },
+          select: { slug: true },
+        });
+        categorySlug = category?.slug;
       }
 
       if (dto.subcategoryId) {
-        const subcategoryTranslation =
-          (await tx.subcategoryTranslation.findFirst({
-            where: {
-              subcategoryId: dto.subcategoryId,
-              languageCode: lang,
-            },
-          })) ??
-          (await tx.subcategoryTranslation.findFirst({
-            where: {
-              subcategoryId: dto.subcategoryId,
-              languageCode: 'hi',
-            },
-          }));
-
-        subcategoryName = subcategoryTranslation?.name;
+        const subcategory = await tx.subcategory.findUnique({
+          where: { id: dto.subcategoryId },
+          select: { slug: true },
+        });
+        subcategorySlug = subcategory?.slug;
       }
+
       const createdAssets = [];
 
       for (const file of normalizedFiles) {
@@ -101,7 +87,7 @@ export class IngestionService {
             extension: file.extension,
             fileSize: file.fileSize,
             fileType: file.fileType,
-            contentYear: contentType.contentYear,
+            contentYear: dto.contentYear,
           },
         });
 
@@ -115,33 +101,33 @@ export class IngestionService {
         });
 
         await tx.$executeRaw`
-    UPDATE file_asset f
-    SET search_vector =
-      to_tsvector(
-        'simple',
-        COALESCE(
-          (SELECT string_agg(ft."displayName", ' ')
-           FROM file_translation ft
-           WHERE ft.file_id = f.id),
-          ''
-        )
-      )
-    WHERE f.id = ${asset.id};
-  `;
+        UPDATE file_asset f
+        SET search_vector =
+          to_tsvector(
+            'simple',
+            COALESCE(
+              (SELECT string_agg(ft."displayName", ' ')
+               FROM file_translation ft
+               WHERE ft.file_id = f.id),
+              ''
+            )
+          )
+        WHERE f.id = ${asset.id};
+      `;
 
         const metadataRows: { key: string; value: string }[] = [];
 
-        if (categoryName) {
+        if (categorySlug) {
           metadataRows.push({
             key: 'category',
-            value: categoryName,
+            value: categorySlug,
           });
         }
 
-        if (subcategoryName) {
+        if (subcategorySlug) {
           metadataRows.push({
             key: 'subcategory',
-            value: subcategoryName,
+            value: subcategorySlug,
           });
         }
 
@@ -167,6 +153,7 @@ export class IngestionService {
         id: file.id,
         fileType: file.fileType,
         fileSize: file.fileSize,
+        year: file.contentYear,
         url: this.fileService.getPublicUrl(file.storageKey),
         uploadedAt: file.uploadedAt,
       })),

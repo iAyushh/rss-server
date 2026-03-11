@@ -1,17 +1,29 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, FileType, FileTranslation } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { PrismaService } from 'src/prisma';
+import { Prisma, FileType } from '@prisma/client';
 import { I18nService } from 'nestjs-i18n';
-import { UpdateFileRequestDto } from './dto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { FileTranslationDto } from './dto';
 
 type FileWithRelations = Prisma.FileAssetGetPayload<{
   include: {
-    metadata: true;
-    translations: true;
+    metadata: { select: { key: true; value: true } };
+    translations: {
+      select: {
+        languageCode: true;
+        displayName: true;
+        description: true;
+      };
+    };
   };
 }>;
+
+type FileTranslationLite = {
+  languageCode: string;
+  displayName: string;
+  description: string | null;
+};
 
 @Injectable()
 export class FileService {
@@ -25,25 +37,32 @@ export class FileService {
   }
 
   private resolveTranslation(
-    translations: FileTranslation[] = [],
+    translations: FileTranslationLite[] = [],
     lang: string,
-  ): FileTranslation | null {
+  ): FileTranslationLite | null {
     if (!translations.length) return null;
 
     let translation = translations.find((t) => t.languageCode === lang);
 
-    if (!translation && lang !== 'hi') {
-      translation = translations.find((t) => t.languageCode === 'hi');
+    if (!translation) {
+      translation =
+        translations.find((t) => t.languageCode === 'hi') ?? translations[0];
     }
 
-    return translation ?? translations[0];
+    return translation ?? null;
   }
 
   private formatFile(file: FileWithRelations, lang: string) {
-    const translations = file.translations ?? [];
-    const metadata = file.metadata ?? [];
+    const translation = this.resolveTranslation(file.translations ?? [], lang);
 
-    const translation = this.resolveTranslation(translations, lang);
+    const metadata =
+      file.metadata?.reduce(
+        (acc, m) => {
+          acc[m.key] = m.value;
+          return acc;
+        },
+        {} as Record<string, string>,
+      ) ?? {};
 
     return {
       id: file.id,
@@ -56,11 +75,13 @@ export class FileService {
       originalName: file.originalName,
       fileSize: file.fileSize,
       fileType: file.fileType,
+
+      year: file.contentYear,
       uploadedAt: file.uploadedAt,
 
       url: this.getPublicUrl(file.storageKey),
 
-      metadata: Object.fromEntries(metadata.map((m) => [m.key, m.value])),
+      metadata,
     };
   }
 
@@ -68,10 +89,16 @@ export class FileService {
     const files = await this.prisma.fileAsset.findMany({
       where: { contentTypeId },
       include: {
-        metadata: true,
-        translations: true,
+        metadata: { select: { key: true, value: true } },
+        translations: {
+          select: {
+            languageCode: true,
+            displayName: true,
+            description: true,
+          },
+        },
       },
-      orderBy: { uploadedAt: 'desc' },
+      orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
     });
 
     return files.map((f) => this.formatFile(f, lang));
@@ -95,12 +122,18 @@ export class FileService {
       this.prisma.fileAsset.findMany({
         where,
         include: {
-          metadata: true,
-          translations: true,
+          metadata: { select: { key: true, value: true } },
+          translations: {
+            select: {
+              languageCode: true,
+              displayName: true,
+              description: true,
+            },
+          },
         },
         skip,
         take,
-        orderBy: { uploadedAt: 'desc' },
+        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
       }),
       this.prisma.fileAsset.count({ where }),
     ]);
@@ -110,53 +143,43 @@ export class FileService {
       total,
     };
   }
+
   async getFilesByCategory(
     categoryId: number,
     params?: {
       skip?: number;
       take?: number;
       type?: FileType;
-      lang: string;
+      lang?: string;
     },
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-    const categoryTranslation =
-      (await this.prisma.categoryTranslation.findFirst({
-        where: { categoryId, languageCode: lang },
-      })) ??
-      (await this.prisma.categoryTranslation.findFirst({
-        where: { categoryId, languageCode: 'hi' },
-      }));
-
-    if (!categoryTranslation) {
-      return { files: [], total: 0 };
-    }
+    const where: Prisma.FileAssetWhereInput = {
+      ...(type && { fileType: type }),
+      contentType: {
+        categoryId,
+      },
+    };
 
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({
-        where: {
-          ...(type && { fileType: type }),
-          contentType: {
-            categoryId: categoryId,
+        where,
+        include: {
+          metadata: { select: { key: true, value: true } },
+          translations: {
+            select: {
+              languageCode: true,
+              displayName: true,
+              description: true,
+            },
           },
         },
-        include: {
-          metadata: true,
-          translations: true,
-        },
-        orderBy: { uploadedAt: 'desc' },
         skip,
         take,
+        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
       }),
-      this.prisma.fileAsset.count({
-        where: {
-          ...(type && { fileType: type }),
-          contentType: {
-            categoryId: categoryId,
-          },
-        },
-      }),
+      this.prisma.fileAsset.count({ where }),
     ]);
 
     return {
@@ -164,6 +187,7 @@ export class FileService {
       total,
     };
   }
+
   async getFilesBySubcategory(
     subcategoryId: number,
     params?: {
@@ -186,12 +210,18 @@ export class FileService {
       this.prisma.fileAsset.findMany({
         where,
         include: {
-          metadata: true,
-          translations: true,
+          metadata: { select: { key: true, value: true } },
+          translations: {
+            select: {
+              languageCode: true,
+              displayName: true,
+              description: true,
+            },
+          },
         },
-        orderBy: { uploadedAt: 'desc' },
         skip,
         take,
+        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
       }),
       this.prisma.fileAsset.count({ where }),
     ]);
@@ -201,17 +231,19 @@ export class FileService {
       total,
     };
   }
-  async update(fileId: number, dto: UpdateFileRequestDto) {
+
+  async update(fileId: number, dto: any) {
     const file = await this.prisma.fileAsset.findUnique({
       where: { id: fileId },
     });
+
     if (!file) {
       throw new NotFoundException('File not found');
     }
 
     if (dto.translations?.length) {
       await this.prisma.$transaction(
-        dto.translations.map((t) =>
+        dto.translations.map((t: FileTranslationDto) =>
           this.prisma.fileTranslation.upsert({
             where: {
               fileId_languageCode: {
@@ -232,22 +264,23 @@ export class FileService {
           }),
         ),
       );
+
       await this.prisma.$executeRaw`
-  UPDATE file_asset f
-  SET search_vector =
-    to_tsvector(
-      'simple',
-      COALESCE(
-        (SELECT string_agg(ft."displayName", ' ')
-         FROM file_translation ft
-         WHERE ft.file_id = f.id),
-        ''
-      )
-    )
-  
-  WHERE f.id = ${fileId};
-  `;
+        UPDATE file_asset f
+        SET search_vector =
+          to_tsvector(
+            'simple',
+            COALESCE(
+              (SELECT string_agg(ft."displayName", ' ')
+               FROM file_translation ft
+               WHERE ft.file_id = f.id),
+              ''
+            )
+          )
+        WHERE f.id = ${fileId};
+      `;
     }
+
     return {
       success: true,
       fileId,
@@ -277,8 +310,13 @@ export class FileService {
 
     await fs
       .unlink(path.join(process.cwd(), 'uploads', file.storageKey))
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('File deletion failed:', err.message);
+      });
 
-    return { success: true, deletedId: id };
+    return {
+      success: true,
+      deletedId: id,
+    };
   }
 }

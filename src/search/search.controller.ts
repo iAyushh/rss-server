@@ -10,12 +10,14 @@ export class SearchController {
 
   @Get()
   async globalSearch(@Query() dto: SearchablePaginatedDto) {
+    const skip = Number(dto.skip ?? 0);
+    const take = Number(dto.take ?? 20);
     return this.searchService.globalSearch(
       dto.search ?? '',
       dto.languageCode ?? 'en',
-      dto.skip ?? 0,
-      dto.take ?? 20,
-      dto.year,
+      skip,
+      take,
+      dto.year ? Number(dto.year) : undefined,
     );
   }
 }
