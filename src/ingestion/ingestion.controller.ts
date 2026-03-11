@@ -6,7 +6,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { IngestionService } from './ingestion.service';
 import { IngestionDto } from './dto';
 import { StorageFilesInterceptor } from 'src/common/interceptors';
@@ -18,6 +18,7 @@ import {
   UserType,
 } from '@Common';
 
+@ApiBearerAuth()
 @ApiTags('Ingestion')
 @Roles(UserType.Admin)
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
@@ -34,6 +35,8 @@ export class IngestionController {
       properties: {
         contentTypeId: { type: 'number', example: 12 },
         contentYear: { type: 'number', example: 2024 },
+
+        lang: { type: 'string', example: 'hi' },
         type: {
           type: 'string',
           enum: [
