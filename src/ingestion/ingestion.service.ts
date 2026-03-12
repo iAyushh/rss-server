@@ -139,6 +139,23 @@ export class IngestionService {
           });
         }
 
+        // update search vector once
+        await tx.$executeRaw`
+  UPDATE file_asset f
+  SET search_vector =
+    to_tsvector(
+      'simple',
+      COALESCE(
+        (
+          SELECT string_agg(ft."displayName", ' ')
+          FROM file_translation ft
+          WHERE ft.file_id = f.id
+        ),
+        ''
+      )
+    )
+  WHERE f.id IN (${Prisma.join(createdAssets.map((a) => a.id))})
+`;
         createdAssets.push(asset);
       }
 
