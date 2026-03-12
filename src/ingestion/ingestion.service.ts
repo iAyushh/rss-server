@@ -28,17 +28,18 @@ export class IngestionService {
   }
 
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException('No files uploaded');
-    }
-
     let metadata: any = {};
+
     if (dto.metadata) {
       try {
         metadata = JSON.parse(dto.metadata);
       } catch {
         throw new BadRequestException('Invalid metadata JSON');
       }
+    }
+
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files uploaded');
     }
 
     const contentType = await this.prisma.contentType.findUnique({
@@ -62,85 +63,94 @@ export class IngestionService {
       description: dto.description ?? null,
     }));
 
-    const assets = await this.prisma.$transaction(
-      async (tx) => {
-        const lang = dto.lang ?? 'hi';
+    const assets = await this.prisma.$transaction(async (tx) => {
+      const lang = dto.lang ?? 'hi';
 
-        let categorySlug: string | undefined;
-        let subcategorySlug: string | undefined;
+      let categorySlug: string | undefined;
+      let subcategorySlug: string | undefined;
 
-        if (dto.categoryId) {
-          const category = await tx.category.findUnique({
-            where: { id: dto.categoryId },
-            select: { slug: true },
-          });
-          categorySlug = category?.slug;
-        }
+      if (dto.categoryId) {
+        const category = await tx.category.findUnique({
+          where: { id: dto.categoryId },
+          select: { slug: true },
+        });
+        categorySlug = category?.slug;
+      }
 
-        if (dto.subcategoryId) {
-          const subcategory = await tx.subcategory.findUnique({
-            where: { id: dto.subcategoryId },
-            select: { slug: true },
-          });
-          subcategorySlug = subcategory?.slug;
-        }
+      if (dto.subcategoryId) {
+        const subcategory = await tx.subcategory.findUnique({
+          where: { id: dto.subcategoryId },
+          select: { slug: true },
+        });
+        subcategorySlug = subcategory?.slug;
+      }
+
+      const createdAssets = [];
+
+      for (const file of normalizedFiles) {
+        const asset = await tx.fileAsset.create({
+          data: {
+            contentTypeId: dto.contentTypeId,
+            originalName: file.originalName,
+            storageKey: file.storageKey,
+            mimeType: file.mimeType,
+            extension: file.extension,
+            fileSize: file.fileSize,
+            fileType: file.fileType,
+            contentYear: dto.contentYear,
+          },
+        });
+
+        await tx.fileTranslation.create({
+          data: {
+            fileId: asset.id,
+            languageCode: lang,
+            displayName: file.displayName,
+            description: file.description,
+          },
+        });
+
+        await tx.$executeRaw`
+        UPDATE file_asset f
+        SET search_vector =
+          to_tsvector(
+            'simple',
+            COALESCE(
+              (SELECT string_agg(ft."displayName", ' ')
+               FROM file_translation ft
+               WHERE ft.file_id = f.id),
+              ''
+            )
+          )
+        WHERE f.id = ${asset.id};
+      `;
+
+        const metadataRows: { key: string; value: string }[] = [];
 
         const categoryValue = metadata.category ?? categorySlug;
         const subcategoryValue = metadata.subcategory ?? subcategorySlug;
 
-        // create assets
-        const createdAssets = [];
-        for (const file of normalizedFiles) {
-          const asset = await tx.fileAsset.create({
-            data: {
-              contentTypeId: dto.contentTypeId,
-              originalName: file.originalName,
-              storageKey: file.storageKey,
-              mimeType: file.mimeType,
-              extension: file.extension,
-              fileSize: file.fileSize,
-              fileType: file.fileType,
-              contentYear: dto.contentYear,
-            },
+        if (categoryValue) {
+          metadataRows.push({
+            key: 'category',
+            value: categoryValue,
           });
-
-          createdAssets.push(asset);
         }
 
-        // translations bulk insert
-        await tx.fileTranslation.createMany({
-          data: createdAssets.map((asset, index) => ({
-            fileId: asset.id,
-            languageCode: lang,
-            displayName: normalizedFiles[index].displayName,
-            description: normalizedFiles[index].description,
-          })),
-        });
-
-        // metadata bulk insert
-        const metadataRows = [];
-
-        for (const asset of createdAssets) {
-          if (categoryValue) {
-            metadataRows.push({
-              fileId: asset.id,
-              key: 'category',
-              value: categoryValue,
-            });
-          }
-
-          if (subcategoryValue) {
-            metadataRows.push({
-              fileId: asset.id,
-              key: 'subcategory',
-              value: subcategoryValue,
-            });
-          }
+        if (subcategoryValue) {
+          metadataRows.push({
+            key: 'subcategory',
+            value: subcategoryValue,
+          });
         }
 
         if (metadataRows.length > 0) {
           await tx.fileMetadata.createMany({
-            data: metadataRows,
+            data: metadataRows.map((m) => ({
+              fileId: asset.id,
+              key: m.key,
+              value: m.value,
+            })),
           });
         }
 
@@ -161,13 +171,11 @@ export class IngestionService {
     )
   WHERE f.id IN (${Prisma.join(createdAssets.map((a) => a.id))})
 `;
+        createdAssets.push(asset);
+      }
 
-        return createdAssets;
-      },
-      {
-        timeout: 20000,
-      },
-    );
+      return createdAssets;
+    });
 
     return {
       success: true,
