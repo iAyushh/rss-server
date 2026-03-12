@@ -110,21 +110,6 @@ export class IngestionService {
           },
         });
 
-        await tx.$executeRaw`
-        UPDATE file_asset f
-        SET search_vector =
-          to_tsvector(
-            'simple',
-            COALESCE(
-              (SELECT string_agg(ft."displayName", ' ')
-               FROM file_translation ft
-               WHERE ft.file_id = f.id),
-              ''
-            )
-          )
-        WHERE f.id = ${asset.id};
-      `;
-
         const metadataRows: { key: string; value: string }[] = [];
 
         const categoryValue = metadata.category ?? categorySlug;
@@ -154,31 +139,34 @@ export class IngestionService {
           });
         }
 
-        if (createdAssets.length > 0) {
-          const ids = createdAssets.map((a) => a.id);
-
-          await tx.$executeRaw`
-  UPDATE file_asset f
-  SET search_vector =
-    to_tsvector(
-      'simple',
-      COALESCE(
-        (
-          SELECT string_agg(ft."displayName",' ')
-          FROM file_translation ft
-          WHERE ft.file_id = f.id
-        ),
-        ''
-      )
-    )
-  WHERE f.id IN (${Prisma.join(ids)});
-  `;
-        }
         createdAssets.push(asset);
       }
 
       return createdAssets;
     });
+
+    // 🔹 search_vector update OUTSIDE transaction (prevents timeout)
+
+    const ids = assets.map((a) => a.id);
+
+    if (ids.length > 0) {
+      await this.prisma.$executeRaw`
+      UPDATE file_asset f
+      SET search_vector =
+        to_tsvector(
+          'simple',
+          COALESCE(
+            (
+              SELECT string_agg(ft."displayName",' ')
+              FROM file_translation ft
+              WHERE ft.file_id = f.id
+            ),
+            ''
+          )
+        )
+      WHERE f.id IN (${Prisma.join(ids)});
+    `;
+    }
 
     return {
       success: true,
