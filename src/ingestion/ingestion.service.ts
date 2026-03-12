@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FileService } from '../file/file.service';
 import { IngestionDto } from './dto';
 import { FILE_TYPE_MIME_MAP } from '../common/constants/file-type-mime.map';
-import { FileType } from '@prisma/client';
+import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
 
 @Injectable()
@@ -146,21 +146,21 @@ export class IngestionService {
 
         // update search vector once
         await tx.$executeRaw`
-          UPDATE file_asset f
-          SET search_vector =
-            to_tsvector(
-              'simple',
-              COALESCE(
-                (
-                  SELECT string_agg(ft."displayName", ' ')
-                  FROM file_translation ft
-                  WHERE ft.file_id = f.id
-                ),
-                ''
-              )
-            )
-          WHERE f.id IN (${createdAssets.map((a) => a.id)});
-        `;
+  UPDATE file_asset f
+  SET search_vector =
+    to_tsvector(
+      'simple',
+      COALESCE(
+        (
+          SELECT string_agg(ft."displayName", ' ')
+          FROM file_translation ft
+          WHERE ft.file_id = f.id
+        ),
+        ''
+      )
+    )
+  WHERE f.id IN (${Prisma.join(createdAssets.map((a) => a.id))})
+`;
 
         return createdAssets;
       },
