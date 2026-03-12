@@ -13,7 +13,7 @@ export class IngestionService {
     private readonly fileService: FileService,
   ) {}
 
-  // MIME validation
+  //  MIME validation
   private validateFiles(files: Express.Multer.File[], type: FileType) {
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
     if (!allowedMimes?.length) return;
@@ -28,16 +28,6 @@ export class IngestionService {
   }
 
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
-    let metadata: any = {};
-
-    if (dto.metadata) {
-      try {
-        metadata = JSON.parse(dto.metadata);
-      } catch {
-        throw new BadRequestException('Invalid metadata JSON');
-      }
-    }
-
     if (!files || files.length === 0) {
       throw new BadRequestException('No files uploaded');
     }
@@ -127,25 +117,22 @@ export class IngestionService {
 
         const metadataRows: { key: string; value: string }[] = [];
 
-        const categoryValue = metadata.category ?? categorySlug;
-        const subcategoryValue = metadata.subcategory ?? subcategorySlug;
-
-        if (categoryValue) {
+        if (categorySlug) {
           metadataRows.push({
             key: 'category',
-            value: categoryValue,
+            value: categorySlug,
           });
         }
 
-        if (subcategoryValue) {
+        if (subcategorySlug) {
           metadataRows.push({
             key: 'subcategory',
-            value: subcategoryValue,
+            value: subcategorySlug,
           });
         }
 
         if (metadataRows.length > 0) {
-          await tx.fileMetadata.createMany({
+          await this.prisma.fileMetadata.createMany({
             data: metadataRows.map((m) => ({
               fileId: asset.id,
               key: m.key,
