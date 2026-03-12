@@ -168,7 +168,6 @@ AND (
 
 ORDER BY year DESC NULLS LAST, rank DESC
 LIMIT ${take} OFFSET ${skip}
-
 `,
     );
   }

@@ -132,7 +132,7 @@ export class IngestionService {
         }
 
         if (metadataRows.length > 0) {
-          await tx.fileMetadata.createMany({
+          await this.prisma.fileMetadata.createMany({
             data: metadataRows.map((m) => ({
               fileId: asset.id,
               key: m.key,
