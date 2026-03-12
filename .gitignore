@@ -14,6 +14,8 @@ lerna-debug.log*
 # Storage
 storage
 
+uploads/
+
 # OS and cache
 .DS_Store
 .eslintcache
