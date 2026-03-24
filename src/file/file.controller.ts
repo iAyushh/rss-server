@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileService } from './file.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { FileType } from '@prisma/client';
 import {
   AccessGuard,
@@ -32,6 +32,7 @@ export class FileController {
   constructor(private readonly fileService: FileService) {}
 
   @Get('content-types/:id')
+  @ApiQuery({ name: 'lang', required: false, type: String })
   async getFilesByContentType(
     @Param('id', ParseIntPipe) id: number,
     @Query('lang') queryLang: string,
@@ -43,6 +44,11 @@ export class FileController {
   }
 
   @Get()
+  @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false, enum: FileType })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiQuery({ name: 'lang', required: false, type: String })
   getAll(
     @Query('contentTypeId') contentTypeId?: number,
     @Query('type') type?: FileType,
@@ -60,6 +66,8 @@ export class FileController {
   }
 
   @Get('category/:id')
+  @ApiQuery({ name: 'type', required: false, enum: FileType })
+  @ApiQuery({ name: 'lang', required: false, type: String })
   getByCategory(
     @Param('id', ParseIntPipe) id: number,
     @Query('lang') queryLang: string,
@@ -78,6 +86,8 @@ export class FileController {
   }
 
   @Get('subcategory/:id')
+  @ApiQuery({ name: 'type', required: false, enum: FileType })
+  @ApiQuery({ name: 'lang', required: false, type: String })
   getBySubcategory(
     @Param('id', ParseIntPipe) id: number,
     @Query('lang') queryLang: string,
