@@ -109,23 +109,40 @@ export class FileService {
     }));
   }
 
-  async getFilesByContentType(contentTypeId: number, lang: string) {
-    const files = await this.prisma.fileAsset.findMany({
-      where: { contentTypeId },
-      include: {
-        metadata: { select: { key: true, value: true } },
-        translations: {
-          select: {
-            languageCode: true,
-            displayName: true,
-            description: true,
+  async getFilesByContentType(contentTypeId: number, params?: { skip?: number; take?: number; type?: FileType; lang?: string }) {
+    const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
+
+    const where: Prisma.FileAssetWhereInput = {
+      contentTypeId,
+      ...(type && { fileType: type }),
+    };
+
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        include: {
+          metadata: { select: { key: true, value: true } },
+          translations: {
+            select: {
+              languageCode: true,
+              displayName: true,
+              description: true,
+            },
           },
         },
-      },
-      orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
-    });
+        skip,
+        take,
+        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
+      }),
+      this.prisma.fileAsset.count({ where }),
 
-    return files.map((f) => this.formatFile(f, lang));
+    ]);
+    return {
+      files: files.map((f) => this.formatFile(f, lang)),
+      total,
+      skip,
+      take,
+    }
   }
 
   async getAllFiles(options: {
@@ -160,32 +177,43 @@ export class FileService {
           { updatedAt: 'desc' },
         ];
 
-    const files = await this.prisma.fileAsset.findMany({
-      where,
-      include: {
-        contentType: {
-          include: {
-            translations: true,
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        include: {
+          contentType: {
+            include: {
+              translations: true,
+            },
+          },
+          metadata: {
+            select: { key: true, value: true },
+          },
+          translations: {
+            where: { languageCode: lang },
+            select: {
+              languageCode: true,
+              displayName: true,
+              description: true,
+            },
           },
         },
-        metadata: {
-          select: { key: true, value: true },
-        },
-        translations: {
-          where: { languageCode: lang },
-          select: {
-            languageCode: true,
-            displayName: true,
-            description: true,
-          },
-        },
-      },
+        skip,
+        take,
+        orderBy,
+      }),
+
+      this.prisma.fileAsset.count({
+        where,
+      }),
+    ]);
+
+    return {
+      data: files.map((f) => this.formatFile(f as any, lang)),
+      total,
       skip,
       take,
-      orderBy,
-    });
-
-    return files.map((f) => this.formatFile(f as any, lang));
+    };
   }
 
   async getFilesByCategory(

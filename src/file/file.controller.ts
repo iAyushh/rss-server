@@ -63,17 +63,26 @@ export class FileController {
   }
 
   @Get('content-types/:id')
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
-  async getFilesByContentType(
+  getFilesByContentType(
     @Param('id', ParseIntPipe) id: number,
-    @Query('lang') queryLang: string,
-    @I18nLang() i18nLang: string,
+    @Query() pagination: PaginatedDto,
+    @Query('type') type?: FileType,
+    @Query('lang') queryLang?: string,
+    @I18nLang() i18nLang?: string,
   ) {
     const lang = queryLang ?? i18nLang ?? 'hi';
 
-    return this.fileService.getFilesByContentType(id, lang);
+    return this.fileService.getFilesByContentType(id, {
+      skip: pagination.skip,
+      take: pagination.take,
+      type,
+      lang,
+    });
   }
-
 
   @Get('category/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
