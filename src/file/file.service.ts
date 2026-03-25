@@ -30,7 +30,7 @@ export class FileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
-  ) {}
+  ) { }
 
   getPublicUrl(storageKey: string) {
     return `${process.env.APP_URL ?? ''}/uploads/${storageKey}`;
@@ -85,6 +85,30 @@ export class FileService {
     };
   }
 
+  async getAllContentTypes(lang: string) {
+    const contentTypes = await this.prisma.contentType.findMany({
+      select: {
+        id: true,
+        slug: true,
+        translations: {
+          where: { languageCode: lang },
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+
+    return contentTypes.map((ct) => ({
+      id: ct.id,
+      name: ct.translations[0]?.name || '',
+    }));
+  }
+
   async getFilesByContentType(contentTypeId: number, lang: string) {
     const files = await this.prisma.fileAsset.findMany({
       where: { contentTypeId },
@@ -104,44 +128,64 @@ export class FileService {
     return files.map((f) => this.formatFile(f, lang));
   }
 
-  async getAllFiles(params: {
+  async getAllFiles(options: {
     contentTypeId?: number;
     type?: FileType;
+    sortBy?: 'updatedAt' | 'fileSize' | 'originalName';
+    order?: 'asc' | 'desc';
     skip?: number;
     take?: number;
     lang: string;
   }) {
-    const { contentTypeId, type, skip = 0, take = 20, lang } = params;
+    const {
+      contentTypeId,
+      type,
+      sortBy,
+      order = 'desc',
+      skip = 0,
+      take = 20,
+      lang,
+    } = options;
 
-    const where: Prisma.FileAssetWhereInput = {
+    const where = {
       ...(contentTypeId && { contentTypeId }),
       ...(type && { fileType: type }),
     };
 
-    const [files, total] = await Promise.all([
-      this.prisma.fileAsset.findMany({
-        where,
-        include: {
-          metadata: { select: { key: true, value: true } },
-          translations: {
-            select: {
-              languageCode: true,
-              displayName: true,
-              description: true,
-            },
+    const orderBy: Prisma.FileAssetOrderByWithRelationInput | Prisma.FileAssetOrderByWithRelationInput[] =
+      sortBy
+        ? { [sortBy]: order }
+        : [
+          { contentYear: 'desc' },
+          { updatedAt: 'desc' },
+        ];
+
+    const files = await this.prisma.fileAsset.findMany({
+      where,
+      include: {
+        contentType: {
+          include: {
+            translations: true,
           },
         },
-        skip,
-        take,
-        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
-      }),
-      this.prisma.fileAsset.count({ where }),
-    ]);
+        metadata: {
+          select: { key: true, value: true },
+        },
+        translations: {
+          where: { languageCode: lang },
+          select: {
+            languageCode: true,
+            displayName: true,
+            description: true,
+          },
+        },
+      },
+      skip,
+      take,
+      orderBy,
+    });
 
-    return {
-      files: files.map((f) => this.formatFile(f, lang)),
-      total,
-    };
+    return files.map((f) => this.formatFile(f as any, lang));
   }
 
   async getFilesByCategory(

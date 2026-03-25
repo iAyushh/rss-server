@@ -29,7 +29,38 @@ import { UpdateFileRequestDto } from './dto';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) {}
+  constructor(private readonly fileService: FileService) { }
+
+
+  @Get()
+  @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false, enum: FileType })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['updatedAt', 'fileSize', 'originalName'] })
+  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiQuery({ name: 'lang', required: false, type: String })
+  async getAllFiles(
+    @Query('contentTypeId') contentTypeId?: number,
+    @Query('type') type?: FileType,
+    @Query('sortBy') sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
+    @Query('order') order?: 'asc' | 'desc',
+    @Query() pagination?: PaginatedDto,
+    @Query('lang') queryLang?: string,
+    @I18nLang() i18nLang?: string,
+  ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+
+    return this.fileService.getAllFiles({
+      contentTypeId: contentTypeId ? Number(contentTypeId) : undefined,
+      type,
+      sortBy,
+      order,
+      skip: pagination?.skip,
+      take: pagination?.take,
+      lang,
+    });
+  }
 
   @Get('content-types/:id')
   @ApiQuery({ name: 'lang', required: false, type: String })
@@ -43,27 +74,6 @@ export class FileController {
     return this.fileService.getFilesByContentType(id, lang);
   }
 
-  @Get()
-  @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
-  @ApiQuery({ name: 'type', required: false, enum: FileType })
-  @ApiQuery({ name: 'skip', required: false, type: Number })
-  @ApiQuery({ name: 'take', required: false, type: Number })
-  @ApiQuery({ name: 'lang', required: false, type: String })
-  getAll(
-    @Query('contentTypeId') contentTypeId?: number,
-    @Query('type') type?: FileType,
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-    @Query('lang') lang = 'hi',
-  ) {
-    return this.fileService.getAllFiles({
-      contentTypeId: contentTypeId ? Number(contentTypeId) : undefined,
-      type,
-      skip: skip ? Number(skip) : 0,
-      take: take ? Number(take) : 20,
-      lang,
-    });
-  }
 
   @Get('category/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
@@ -103,6 +113,15 @@ export class FileController {
       type,
       lang,
     });
+  }
+  @Get('list/content-types')
+  @ApiQuery({ name: 'lang', required: false, type: String })
+  getAllContentTypes(
+    @Query('lang') queryLang?: string,
+    @I18nLang() i18nLang?: string,
+  ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+    return this.fileService.getAllContentTypes(lang);
   }
 
   @Patch(':id')
