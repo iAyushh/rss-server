@@ -1,6 +1,7 @@
 import { IsInt, IsArray, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ContentTypeTranslationDto } from './content-type-translation.dto';
+import { ContentMetadataDto } from './content-metadata.dto';
 
 export class CreateContentTypeDto {
   @IsInt()
@@ -18,4 +19,12 @@ export class CreateContentTypeDto {
   @ValidateNested({ each: true })
   @Type(() => ContentTypeTranslationDto)
   translations!: ContentTypeTranslationDto[];
+
+   @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ContentMetadataDto)
+  metadata?: ContentMetadataDto[];
+
+  
 }

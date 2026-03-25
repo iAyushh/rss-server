@@ -16,7 +16,7 @@ export class ContentTypeService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) {}
+  ) { }
 
   private async invalidateCache() {
     await this.cache.del('content-types:hi');
@@ -56,6 +56,7 @@ export class ContentTypeService {
       });
 
       const contentYear = dto.contentYear ?? new Date().getFullYear();
+
       return tx.contentType.create({
         data: {
           slug: generatedSlug,
@@ -63,12 +64,24 @@ export class ContentTypeService {
           categoryId: dto.categoryId,
           subcategoryId: dto.subcategoryId,
           contentYear,
+
           translations: {
             create: dto.translations,
           },
+
+          metadata: dto.metadata
+            ? {
+              create: dto.metadata.map((m) => ({
+                key: m.key,
+                value: m.value,
+              })),
+            }
+            : undefined,
         },
+
         include: {
           translations: true,
+          metadata: true,
         },
       });
     });
@@ -267,7 +280,7 @@ WHERE ct.id = ${content.id};
 
         if (
           !result[year].categories[category.slug].subcategories[
-            subcategory.slug
+          subcategory.slug
           ]
         ) {
           result[year].categories[category.slug].subcategories[

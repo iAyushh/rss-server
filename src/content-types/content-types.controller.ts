@@ -28,27 +28,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('content-types')
 export class ContentTypeController {
-  constructor(private readonly contentTypeService: ContentTypeService) {}
-
-  @Get('index')
-  async getIndex(@Query('lang') lang = 'en') {
-    return this.contentTypeService.getIndexNavigation(lang);
-  }
-
-  @Get(':year/:categorySlug/:contentSlug')
-  async getContentByYearSlug(
-    @Param('year', ParseIntPipe) year: number,
-    @Param('categorySlug') categorySlug: string,
-    @Param('contentSlug') contentSlug: string,
-    @Query('lang') lang = 'hi',
-  ) {
-    return this.contentTypeService.getContentByYearSlug(
-      year,
-      categorySlug,
-      contentSlug,
-      lang,
-    );
-  }
+  constructor(private readonly contentTypeService: ContentTypeService) { }
 
   @Post()
   create(@Body() dto: CreateContentTypeDto) {
@@ -75,6 +55,28 @@ export class ContentTypeController {
       take ? Number(take) : 10,
     );
   }
+
+  @Get('index')
+  async getIndex(@Query('lang') lang = 'en') {
+    return this.contentTypeService.getIndexNavigation(lang);
+  }
+
+  @Get(':year/:categorySlug/:contentSlug')
+  async getContentByYearSlug(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('categorySlug') categorySlug: string,
+    @Param('contentSlug') contentSlug: string,
+    @Query('lang') lang = 'hi',
+  ) {
+    return this.contentTypeService.getContentByYearSlug(
+      year,
+      categorySlug,
+      contentSlug,
+      lang,
+    );
+  }
+
+
 
   @Roles(UserType.Admin)
   @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
