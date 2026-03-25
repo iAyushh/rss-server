@@ -4,7 +4,7 @@ import { PrismaService } from 'src/prisma';
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private parseSearchQuery(query: string) {
     const tokens = query.trim().split(/\s+/);
@@ -53,6 +53,7 @@ export class SearchService {
     if (!searchTerm && !yearLike && !parsed.year) {
       return [];
     }
+
     return this.prisma.$queryRaw(
       Prisma.sql`
 
@@ -68,7 +69,10 @@ SELECT
     SELECT name
     FROM category_translation
     WHERE category_id = c.id
-    AND language_code = ${languageCode}
+    ORDER BY 
+      (language_code = ${languageCode}) DESC,
+      (language_code = 'en') DESC,
+      (language_code = 'hi') DESC
     LIMIT 1
   ) AS title,
   ts_rank(
@@ -92,7 +96,10 @@ SELECT
     SELECT name
     FROM subcategory_translation
     WHERE subcategory_id = s.id
-    AND language_code = ${languageCode}
+    ORDER BY 
+      (language_code = ${languageCode}) DESC,
+      (language_code = 'en') DESC,
+      (language_code = 'hi') DESC
     LIMIT 1
   ) AS title,
   ts_rank(
@@ -116,7 +123,10 @@ SELECT
     SELECT name
     FROM content_type_translation
     WHERE content_type_id = ct.id
-    AND language_code = ${languageCode}
+    ORDER BY 
+      (language_code = ${languageCode}) DESC,
+      (language_code = 'en') DESC,
+      (language_code = 'hi') DESC
     LIMIT 1
   ) AS title,
   ts_rank(
@@ -146,7 +156,10 @@ SELECT
     SELECT "displayName"
     FROM file_translation
     WHERE file_id = f.id
-    AND language_code = ${languageCode}
+    ORDER BY 
+      (language_code = ${languageCode}) DESC,
+      (language_code = 'en') DESC,
+      (language_code = 'hi') DESC
     LIMIT 1
   ) AS title,
   ts_rank(
