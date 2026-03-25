@@ -31,7 +31,7 @@ export class ContentTypeController {
   constructor(private readonly contentTypeService: ContentTypeService) {}
 
   @Get('index')
-  async getIndex(@Query('lang') lang = 'hi') {
+  async getIndex(@Query('lang') lang = 'en') {
     return this.contentTypeService.getIndexNavigation(lang);
   }
 
