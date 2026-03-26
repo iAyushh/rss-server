@@ -86,8 +86,13 @@ export class IngestionService {
       }
 
       const createdAssets = [];
+      const baseUrl = process.env.BASE_URL + '/uploads';
 
       for (const file of normalizedFiles) {
+        const fileUrl = `${baseUrl}/${file.storageKey}`;
+
+        console.log('Generated URL:', fileUrl);
+
         const asset = await tx.fileAsset.create({
           data: {
             contentTypeId: dto.contentTypeId,
@@ -98,6 +103,7 @@ export class IngestionService {
             fileSize: file.fileSize,
             fileType: file.fileType,
             contentYear: dto.contentYear,
+            url: fileUrl,
           },
         });
 
@@ -145,7 +151,7 @@ export class IngestionService {
       return createdAssets;
     });
 
-    // 🔹 search_vector update OUTSIDE transaction (prevents timeout)
+    // search_vector update OUTSIDE transaction (prevents timeout)
 
     const ids = assets.map((a) => a.id);
 
