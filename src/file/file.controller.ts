@@ -29,13 +29,16 @@ import { UpdateFileRequestDto } from './dto';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) { }
-
+  constructor(private readonly fileService: FileService) {}
 
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
   @ApiQuery({ name: 'type', required: false, enum: FileType })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['updatedAt', 'fileSize', 'originalName'] })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['updatedAt', 'fileSize', 'originalName'],
+  })
   @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
