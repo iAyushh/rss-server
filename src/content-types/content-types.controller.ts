@@ -28,7 +28,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('content-types')
 export class ContentTypeController {
-  constructor(private readonly contentTypeService: ContentTypeService) { }
+  constructor(private readonly contentTypeService: ContentTypeService) {}
 
   @Post()
   create(@Body() dto: CreateContentTypeDto) {
@@ -75,8 +75,6 @@ export class ContentTypeController {
       lang,
     );
   }
-
-
 
   @Roles(UserType.Admin)
   @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)

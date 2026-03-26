@@ -102,14 +102,16 @@ export class FileService {
       },
     });
 
-
     return contentTypes.map((ct) => ({
       id: ct.id,
       name: ct.translations[0]?.name || '',
     }));
   }
 
-  async getFilesByContentType(contentTypeId: number, params?: { skip?: number; take?: number; type?: FileType; lang?: string }) {
+  async getFilesByContentType(
+    contentTypeId: number,
+    params?: { skip?: number; take?: number; type?: FileType; lang?: string },
+  ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
     const where: Prisma.FileAssetWhereInput = {
@@ -135,14 +137,13 @@ export class FileService {
         orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
       }),
       this.prisma.fileAsset.count({ where }),
-
     ]);
     return {
       files: files.map((f) => this.formatFile(f, lang)),
       total,
       skip,
       take,
-    }
+    };
   }
 
   async getAllFiles(options: {
@@ -169,13 +170,11 @@ export class FileService {
       ...(type && { fileType: type }),
     };
 
-    const orderBy: Prisma.FileAssetOrderByWithRelationInput | Prisma.FileAssetOrderByWithRelationInput[] =
-      sortBy
+    const orderBy:
+      | Prisma.FileAssetOrderByWithRelationInput
+      | Prisma.FileAssetOrderByWithRelationInput[] = sortBy
         ? { [sortBy]: order }
-        : [
-          { contentYear: 'desc' },
-          { updatedAt: 'desc' },
-        ];
+        : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
 
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({
@@ -190,7 +189,6 @@ export class FileService {
             select: { key: true, value: true },
           },
           translations: {
-            where: { languageCode: lang },
             select: {
               languageCode: true,
               displayName: true,

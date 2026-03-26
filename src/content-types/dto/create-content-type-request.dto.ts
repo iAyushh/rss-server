@@ -20,11 +20,9 @@ export class CreateContentTypeDto {
   @Type(() => ContentTypeTranslationDto)
   translations!: ContentTypeTranslationDto[];
 
-   @IsOptional()
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ContentMetadataDto)
   metadata?: ContentMetadataDto[];
-
-  
 }
