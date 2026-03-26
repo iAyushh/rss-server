@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { SearchablePaginatedDto } from '@Common';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -6,7 +6,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 @ApiBearerAuth()
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(private readonly searchService: SearchService) { }
 
   @Get()
   async globalSearch(@Query() dto: SearchablePaginatedDto) {
@@ -23,6 +23,20 @@ export class SearchController {
       skip,
       take,
       extractedYear,
+    );
+  }
+
+  @Get('files')
+  async searchFiles(@Query() dto: SearchablePaginatedDto) {
+    const skip = Number(dto.skip ?? 0);
+    const take = Number(dto.take ?? 20);
+
+    return this.searchService.searchFiles(
+      dto.search ?? '',
+      dto.languageCode ?? 'en',
+      skip,
+      take,
+      dto.year ? Number(dto.year) : undefined,
     );
   }
 }
