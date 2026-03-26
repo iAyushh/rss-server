@@ -86,7 +86,7 @@ export class IngestionService {
       }
 
       const createdAssets = [];
-      const baseUrl = process.env.BASE_URL + '/uploads';
+      const baseUrl = process.env.APP_URL + '/uploads';
 
       for (const file of normalizedFiles) {
         const fileUrl = `${baseUrl}/${file.storageKey}`;
