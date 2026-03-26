@@ -13,6 +13,7 @@ export const storageConfigFactory = registerAs('storage', () => ({
     '.txt',
     '.csv',
     '.xls',
+    '.xlsx',
     '.mp3',
     '.mp4',
   ],

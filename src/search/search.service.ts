@@ -4,7 +4,7 @@ import { PrismaService } from 'src/prisma';
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private parseSearchQuery(query: string) {
     const tokens = query.trim().split(/\s+/);
@@ -183,5 +183,74 @@ ORDER BY year DESC NULLS LAST, rank DESC
 LIMIT ${take} OFFSET ${skip}
 `,
     );
+  }
+
+
+  async searchFiles(
+    search?: string,
+    languageCode = 'en',
+    skip = 0,
+    take = 20,
+    year?: number,
+  ) {
+    return this.prisma.fileAsset.findMany({
+      where: {
+        ...(year && { contentYear: year }),
+        OR: search
+          ? [
+            // File name
+            {
+              translations: {
+                some: {
+                  displayName: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                  languageCode,
+                },
+              },
+            },
+
+            // Content Type name
+            {
+              contentType: {
+                translations: {
+                  some: {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                    languageCode,
+                  },
+                },
+              },
+            },
+          ]
+          : undefined,
+      },
+
+      include: {
+        translations: true,
+
+        contentType: {
+          include: {
+            translations: true,
+            category: {
+              include: { translations: true },
+            },
+            subcategory: {
+              include: { translations: true },
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        createdAt: 'desc',
+      },
+
+      skip,
+      take,
+    });
   }
 }
