@@ -4,7 +4,7 @@ import { PrismaService } from 'src/prisma';
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   private parseSearchQuery(query: string) {
     const tokens = query.trim().split(/\s+/);

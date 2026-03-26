@@ -16,7 +16,7 @@ export class ContentTypeService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) { }
+  ) {}
 
   private async invalidateCache() {
     await this.cache.del('content-types:hi');
@@ -71,11 +71,11 @@ export class ContentTypeService {
 
           metadata: dto.metadata
             ? {
-              create: dto.metadata.map((m) => ({
-                key: m.key,
-                value: m.value,
-              })),
-            }
+                create: dto.metadata.map((m) => ({
+                  key: m.key,
+                  value: m.value,
+                })),
+              }
             : undefined,
         },
 
@@ -280,7 +280,7 @@ WHERE ct.id = ${content.id};
 
         if (
           !result[year].categories[category.slug].subcategories[
-          subcategory.slug
+            subcategory.slug
           ]
         ) {
           result[year].categories[category.slug].subcategories[

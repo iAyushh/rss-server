@@ -290,6 +290,8 @@ model FileAsset {
   fileType    FileType
   contentYear Int?     @map("content_year")
 
+   url String? 
+
   uploadedAt DateTime @default(now()) @map("uploaded_at")
 
   createdAt DateTime @default(now()) @map("created_at")
