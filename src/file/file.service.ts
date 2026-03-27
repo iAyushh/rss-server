@@ -170,10 +170,22 @@ export class FileService {
       ...(type && { fileType: type }),
     };
 
+
+    const validSortFields = ['updatedAt', 'fileSize', 'originalName'];
+    const validOrders = ['asc', 'desc'];
+
+    const cleanSortBy = validSortFields.includes(sortBy as string)
+      ? sortBy
+      : undefined;
+
+    const cleanOrder = validOrders.includes(order as string)
+      ? order
+      : 'desc';
+
     const orderBy:
       | Prisma.FileAssetOrderByWithRelationInput
-      | Prisma.FileAssetOrderByWithRelationInput[] = sortBy
-        ? { [sortBy]: order }
+      | Prisma.FileAssetOrderByWithRelationInput[] = cleanSortBy
+        ? { [cleanSortBy]: cleanOrder }
         : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
 
     const [files, total] = await Promise.all([
