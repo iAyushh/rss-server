@@ -23,7 +23,7 @@ export class IngestionService {
     return;
   }
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
-    if (!allowedMimes) return;
+    if (!allowedMimes.length) return;
 
     for (const file of files) {
       if (!allowedMimes.includes(file.mimetype)) {
