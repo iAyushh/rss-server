@@ -11,8 +11,8 @@ export const FILE_TYPE_MIME_MAP: Record<FileType, string[]> = {
   ],
 
   CSV: ['text/csv',
-  'application/csv',
-  'application/vnd.ms-excel',],
+    'application/csv',
+    'application/vnd.ms-excel',],
 
   EXCEL: [
     'application/vnd.ms-excel',
@@ -36,6 +36,8 @@ export const FILE_TYPE_MIME_MAP: Record<FileType, string[]> = {
     'video/mp4',
     'video/webm',
     'video/ogg',
+    'video/x-webm',
+    'application/octet-stream',
     'video/quicktime', // mov
     'video/x-msvideo', // avi
     'video/x-matroska', // mkv
