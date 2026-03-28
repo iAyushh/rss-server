@@ -219,7 +219,7 @@ if (newEnglish?.name?.trim()) {
       if (!exists) break;
 
       counter++;
-      slug = `${newSlugBase}-${counter}`;
+      slug = `${newSlugBase}-${counter}`; 
     }
 
     await this.prisma.subcategory.update({

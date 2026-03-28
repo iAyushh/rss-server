@@ -24,8 +24,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 @ApiBearerAuth()
 @ApiTags('Content-Types')
-@Roles(UserType.Admin)
-@UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, AccessGuard)
 @Controller('content-types')
 export class ContentTypeController {
   constructor(private readonly contentTypeService: ContentTypeService) {}
