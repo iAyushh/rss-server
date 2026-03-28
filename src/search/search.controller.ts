@@ -33,7 +33,7 @@ export class SearchController {
 
     return this.searchService.searchFiles(
       dto.search ?? '',
-      dto.languageCode ?? 'en',
+      dto.languageCode ?? 'hi',
       skip,
       take,
       dto.year ? Number(dto.year) : undefined,
