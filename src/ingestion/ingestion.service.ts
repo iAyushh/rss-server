@@ -18,7 +18,7 @@ export class IngestionService {
 
   private validateFiles(files: Express.Multer.File[], type: FileType, lang: string) {
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
-    if (!allowedMimes?.length) return;
+    if (!allowedMimes) return;
 
     for (const file of files) {
       if (!allowedMimes.includes(file.mimetype)) {
