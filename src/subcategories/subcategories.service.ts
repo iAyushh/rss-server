@@ -13,6 +13,8 @@ import {
 } from './dto';
 import slugify from 'slugify';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { nanoid } from 'nanoid';
+import { generateSlug } from '@Common';
 
 @Injectable()
 export class SubcategoriesService {
@@ -20,7 +22,7 @@ export class SubcategoriesService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) {}
+  ) { }
 
   private async invalidateCache(categoryId: number) {
     await this.cache.del(`subcategories:${categoryId}:hi`);
@@ -43,32 +45,41 @@ export class SubcategoriesService {
 
     let slug: string;
 
+
     if (slugSource) {
-      slug = slugify(slugSource, {
-        lower: true,
-        trim: true,
-      });
-    } else {
-      slug = `subcategory-${Date.now()}`;
+      slug = generateSlug(slugSource);
+
+      if (!slug) {
+        throw new BadRequestException(
+          this.i18n.t('common.errors.INVALID_SLUG', { lang }),
+        );
+      }
+
+      for (const t of dto.translations) {
+        const normalizedName = t.name.trim().normalize('NFC');
+
+        const exists = await this.prisma.categoryTranslation.findFirst({
+          where: {
+            name: {
+              equals: normalizedName,
+              mode: 'insensitive',
+            },
+            languageCode: t.languageCode,
+          },
+        });
+
+        if (exists) {
+          throw new BadRequestException(
+            this.i18n.t('common.errors.CATEGORY_ALREADY_EXISTS', { lang }),
+          );
+        }
+      }
+
     }
 
-    if (!slug) {
-      throw new BadRequestException(
-        this.i18n.t('common.errors.INVALID_SLUG', { lang }),
-      );
-    }
 
-    const exists = await this.prisma.subcategory.findFirst({
-      where: {
-        slug,
-        categoryId: dto.categoryId,
-      },
-    });
-
-    if (exists) {
-      throw new BadRequestException(
-        this.i18n.t('common.errors.SUBCATEGORY_ALREADY_EXISTS', { lang }),
-      );
+    else {
+      slug = `subcategory-${nanoid(5)}`;
     }
 
     const subcategory = await this.prisma.subcategory.create({
@@ -186,6 +197,37 @@ WHERE s.id = ${subcategory.id};
         );
       });
     }
+    const newEnglish = dto.translations?.find(
+  (t) => t.languageCode === 'en',
+);
+
+if (newEnglish?.name?.trim()) {
+  const newSlugBase = generateSlug(newEnglish.name);
+
+  if (newSlugBase) {
+    let slug = newSlugBase;
+    let counter = 0;
+
+    while (true) {
+      const exists = await this.prisma.subcategory.findFirst({
+        where: {
+          slug,
+          NOT: { id }, 
+        },
+      });
+
+      if (!exists) break;
+
+      counter++;
+      slug = `${newSlugBase}-${counter}`;
+    }
+
+    await this.prisma.subcategory.update({
+      where: { id },
+      data: { slug },
+    });
+  }
+}
     await this.prisma.$executeRaw`
 UPDATE subcategory s
 SET search_vector =
@@ -208,7 +250,7 @@ WHERE s.id = ${id};
     };
   }
 
-  // REMOVE
+
   async remove(id: number, lang: string) {
     const subcategory = await this.prisma.subcategory.findUnique({
       where: { id },

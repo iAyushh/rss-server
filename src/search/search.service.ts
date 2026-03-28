@@ -59,7 +59,7 @@ export class SearchService {
 
 SELECT * FROM (
 
--- CATEGORY
+
 SELECT
   'category' AS type,
   c.id,
@@ -86,7 +86,7 @@ AND c.search_vector @@ to_tsquery('simple', (${searchTerm})::text || ':*')
 
 UNION ALL
 
--- SUBCATEGORY
+
 SELECT
   'subcategory' AS type,
   s.id,
@@ -113,7 +113,7 @@ AND s.search_vector @@ to_tsquery('simple', (${searchTerm})::text || ':*')
 
 UNION ALL
 
--- CONTENT
+
 SELECT
   'content' AS type,
   ct.id,
@@ -146,7 +146,7 @@ AND (
 
 UNION ALL
 
--- FILE
+
 SELECT
   'file' AS type,
   f.id,
@@ -193,64 +193,109 @@ LIMIT ${take} OFFSET ${skip}
     take = 20,
     year?: number,
   ) {
-    return this.prisma.fileAsset.findMany({
+    
+    let files = await this.prisma.fileAsset.findMany({
       where: {
         ...(year && { contentYear: year }),
-        OR: search
-          ? [
-            // File name
-            {
-              translations: {
-                some: {
-                  displayName: {
-                    contains: search,
-                    mode: 'insensitive',
-                  },
-                  languageCode,
-                },
-              },
-            },
 
-            // Content Type name
-            {
-              contentType: {
-                translations: {
-                  some: {
-                    name: {
-                      contains: search,
-                      mode: 'insensitive',
-                    },
-                    languageCode,
-                  },
-                },
+        ...(search && {
+          translations: {
+            some: {
+              displayName: {
+                contains: search,
+                mode: 'insensitive',
               },
+              languageCode, 
             },
-          ]
-          : undefined,
+          },
+        }),
       },
 
       include: {
         translations: true,
-
         contentType: {
           include: {
             translations: true,
-            category: {
-              include: { translations: true },
-            },
-            subcategory: {
-              include: { translations: true },
-            },
+            category: { include: { translations: true } },
+            subcategory: { include: { translations: true } },
           },
         },
       },
 
-      orderBy: {
-        createdAt: 'desc',
-      },
-
       skip,
       take,
+    });
+
+    
+    if (search && files.length === 0) {
+      files = await this.prisma.fileAsset.findMany({
+        where: {
+          ...(year && { contentYear: year }),
+
+          translations: {
+            some: {
+              displayName: {
+                contains: search,
+                mode: 'insensitive',
+              },
+             
+            },
+          },
+        },
+
+        include: {
+          translations: true,
+          contentType: {
+            include: {
+              translations: true,
+              category: { include: { translations: true } },
+              subcategory: { include: { translations: true } },
+            },
+          },
+        },
+
+        skip,
+        take,
+      });
+    }
+
+    
+    return files.map((file) => {
+      const pick = (arr: any[]) =>
+        arr.find((t) => t.languageCode === languageCode) ||
+        arr.find((t) => t.languageCode === 'en') ||
+        arr[0];
+
+      return {
+        ...file,
+        translations: file.translations.length ? [pick(file.translations)] : [],
+        contentType: file.contentType
+          ? {
+            ...file.contentType,
+            translations: file.contentType.translations.length
+              ? [pick(file.contentType.translations)]
+              : [],
+            category: file.contentType.category
+              ? {
+                ...file.contentType.category,
+                translations:
+                  file.contentType.category.translations.length
+                    ? [pick(file.contentType.category.translations)]
+                    : [],
+              }
+              : null,
+            subcategory: file.contentType.subcategory
+              ? {
+                ...file.contentType.subcategory,
+                translations:
+                  file.contentType.subcategory.translations.length
+                    ? [pick(file.contentType.subcategory.translations)]
+                    : [],
+              }
+              : null,
+          }
+          : null,
+      };
     });
   }
 }
