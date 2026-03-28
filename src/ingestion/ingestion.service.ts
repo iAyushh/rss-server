@@ -17,6 +17,11 @@ export class IngestionService {
 
 
   private validateFiles(files: Express.Multer.File[], type: FileType, lang: string) {
+
+    if (!type) {
+    console.log('No file type provided, skipping validation');
+    return;
+  }
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
     if (!allowedMimes) return;
 

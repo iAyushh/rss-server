@@ -11,6 +11,7 @@ export class IngestionDto {
   @IsInt()
   contentYear!: number;
 
+  @IsOptional()
   @IsEnum(FileType)
   type!: FileType;
 
