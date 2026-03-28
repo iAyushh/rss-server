@@ -16,7 +16,7 @@ export class IngestionService {
   ) { }
 
 
-  private validateFiles(files: Express.Multer.File[], type: FileType, lang: string) {
+  private validateFiles(files: Express.Multer.File[],  type: FileType | undefined, lang: string) {
 
     if (!type) {
     console.log('No file type provided, skipping validation');
@@ -98,7 +98,7 @@ export class IngestionService {
       for (const file of normalizedFiles) {
         const fileUrl = `${baseUrl}/${file.storageKey}`;
 
-        console.log('Generated URL:', fileUrl);
+       const finalType = dto.type ?? FileType.OTHER;
 
         const asset = await tx.fileAsset.create({
           data: {
@@ -108,7 +108,7 @@ export class IngestionService {
             mimeType: file.mimeType,
             extension: file.extension,
             fileSize: file.fileSize,
-            fileType: file.fileType,
+            fileType: finalType,
             contentYear: dto.contentYear,
             url: fileUrl,
           },
