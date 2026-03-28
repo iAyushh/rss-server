@@ -24,7 +24,7 @@ export class ContentTypeService {
   }
 
   async create(dto: CreateContentTypeDto) {
-    // 1. Validate category exists
+    
     const category = await this.prisma.category.findUnique({
       where: { id: dto.categoryId },
     });
@@ -33,7 +33,7 @@ export class ContentTypeService {
       throw new BadRequestException('Invalid categoryId');
     }
 
-    // 2. Validate subcategory (if provided)
+   
     if (dto.subcategoryId) {
       const sub = await this.prisma.subcategory.findUnique({
         where: { id: dto.subcategoryId },
@@ -46,7 +46,7 @@ export class ContentTypeService {
       }
     }
 
-    // 3. Transactional create
+  
     const content = await this.prisma.$transaction(async (tx) => {
       const baseName = dto.translations?.[0]?.name || 'content';
 
@@ -316,7 +316,7 @@ WHERE ct.id = ${content.id};
     }));
   }
 
-  //Update
+  
   async update(id: number, dto: UpdateContentTypeDto, lang: string) {
     const exists = await this.prisma.contentType.findUnique({
       where: { id },
@@ -329,7 +329,7 @@ WHERE ct.id = ${content.id};
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // update base fields if provided
+      
       await tx.contentType.update({
         where: { id },
         data: {
@@ -384,7 +384,7 @@ WHERE ct.id = ${id};
     };
   }
 
-  //Delete content
+  
   async remove(id: number) {
     const content = await this.prisma.contentType.findUnique({
       where: { id },

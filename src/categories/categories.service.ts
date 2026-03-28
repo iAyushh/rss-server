@@ -10,6 +10,8 @@ import { CategoryTranslation } from '@prisma/client';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
 import slugify from 'slugify';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { generateSlug } from '@Common';
+import { nanoid } from 'nanoid';
 
 @Injectable()
 export class CategoryService {
@@ -17,7 +19,7 @@ export class CategoryService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) {}
+  ) { }
 
   private async invalidateCache() {
     await this.cache.del('categories:hi');
@@ -25,61 +27,93 @@ export class CategoryService {
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
+
     const english = dto.translations.find((t) => t.languageCode === 'en');
     // const hindi = dto.translations.find((t) => t.languageCode === 'hi');
+
 
     const slugSource = english?.name?.trim();
 
     let slug: string;
 
+
     if (slugSource) {
-      slug = slugify(slugSource, {
-        lower: true,
-        trim: true,
-      });
-    } else {
-      slug = `category-${Date.now()}`;
+      slug = generateSlug(slugSource);
+
+      if (!slug) {
+        throw new BadRequestException(
+          this.i18n.t('common.errors.INVALID_SLUG', { lang }),
+        );
+      }
+
+      for (const t of dto.translations) {
+        const normalizedName = t.name.trim().normalize('NFC');
+
+        const exists = await this.prisma.categoryTranslation.findFirst({
+          where: {
+            name: {
+              equals: normalizedName,
+              mode: 'insensitive',
+            },
+            languageCode: t.languageCode,
+          },
+        });
+
+        if (exists) {
+          throw new BadRequestException(
+            this.i18n.t('common.errors.CATEGORY_ALREADY_EXISTS', { lang }),
+          );
+        }
+      }
+
     }
 
-    if (!slug) {
-      throw new BadRequestException(
-        this.i18n.t('common.errors.INVALID_SLUG', { lang }),
-      );
-    }
 
-    const exists = await this.prisma.category.findUnique({ where: { slug } });
-    if (exists) {
-      throw new BadRequestException(
-        this.i18n.t('common.errors.CATEGORY_ALREADY_EXISTS', { lang }),
-      );
+    else {
+      slug = `category-${nanoid(5)}`;
     }
+    try {
 
-    const category = await this.prisma.category.create({
-      data: {
-        slug,
-        translations: {
-          create: dto.translations,
+      const category = await this.prisma.category.create({
+        data: {
+          slug,
+          translations: {
+            create: dto.translations.map((t)=>({
+              ...t,
+              name: t.name.trim().normalize('NFC'),
+            }))
+          },
         },
-      },
-    });
+      });
 
-    await this.prisma.$executeRaw`
-UPDATE category c
-SET search_vector =
-  to_tsvector(
-    'simple',
-    COALESCE(
-      (SELECT string_agg(ct.name, ' ')
-       FROM category_translation ct
-       WHERE ct.category_id = c.id),
-      ''
-    )
-  )
-WHERE c.id = ${category.id};
-`;
 
-    await this.invalidateCache();
-    return category;
+
+      await this.prisma.$executeRaw`
+    UPDATE category c
+    SET search_vector =
+      to_tsvector(
+        'simple',
+        COALESCE(
+          (SELECT string_agg(ct.name, ' ')
+           FROM category_translation ct
+           WHERE ct.category_id = c.id),
+          ''
+        )
+      )
+    WHERE c.id = ${category.id};
+  `;
+
+      await this.invalidateCache();
+      return category;
+
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new BadRequestException(
+          this.i18n.t('common.errors.CATEGORY_ALREADY_EXISTS', { lang }),
+        );
+      }
+      throw error;
+    }
   }
 
   async findAll(lang: string, skip = 0, take = 20) {
@@ -127,6 +161,7 @@ WHERE c.id = ${category.id};
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
+      include: { translations: true }
     });
 
     if (!category) {
@@ -134,6 +169,10 @@ WHERE c.id = ${category.id};
         this.i18n.t('common.errors.CATEGORY_NOT_FOUND', { lang }),
       );
     }
+
+    const oldEnglish = category.translations.find(
+      (t) => t.languageCode === 'en',
+    );
 
     if (dto.translations?.length) {
       await this.prisma.$transaction(
@@ -159,6 +198,40 @@ WHERE c.id = ${category.id};
         ),
       );
     }
+
+    const newEnglish = dto.translations?.find(
+      (t) => t.languageCode === 'en',
+    );
+
+    if (newEnglish?.name?.trim()) {
+      const newSlugBase = generateSlug(newEnglish.name);
+
+      if (newSlugBase) {
+        let slug = newSlugBase;
+        let counter = 0;
+
+        while (true) {
+          const exists = await this.prisma.category.findFirst({
+            where: {
+              slug,
+              NOT: { id },
+            },
+          });
+
+          if (!exists) break;
+
+          counter++;
+          slug = `${newSlugBase}-${counter}`;
+        }
+
+        await this.prisma.category.update({
+          where: { id },
+          data: { slug },
+        });
+      }
+    }
+
+
     await this.prisma.$executeRaw`
   UPDATE category c
   SET search_vector =

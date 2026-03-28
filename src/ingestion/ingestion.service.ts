@@ -5,23 +5,25 @@ import { IngestionDto } from './dto';
 import { FILE_TYPE_MIME_MAP } from '../common/constants/file-type-mime.map';
 import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
+import { I18nService } from 'nestjs-i18n';
 
 @Injectable()
 export class IngestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileService: FileService,
-  ) {}
+    private readonly i18n: I18nService,
+  ) { }
 
-  // MIME validation
-  private validateFiles(files: Express.Multer.File[], type: FileType) {
+
+  private validateFiles(files: Express.Multer.File[], type: FileType, lang: string) {
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
     if (!allowedMimes?.length) return;
 
     for (const file of files) {
       if (!allowedMimes.includes(file.mimetype)) {
         throw new BadRequestException(
-          `Invalid file "${file.originalname}" for type ${type}`,
+          this.i18n.t('common.errors.INVALID_FILE_TYPE', { lang }),
         );
       }
     }
@@ -50,7 +52,7 @@ export class IngestionService {
       throw new BadRequestException('Invalid contentTypeId');
     }
 
-    this.validateFiles(files, dto.type);
+    this.validateFiles(files, dto.type, dto.lang ?? 'hi');
 
     const normalizedFiles = files.map((file) => ({
       originalName: file.originalname,
@@ -151,7 +153,7 @@ export class IngestionService {
       return createdAssets;
     });
 
-    // search_vector update OUTSIDE transaction (prevents timeout)
+
 
     const ids = assets.map((a) => a.id);
 
