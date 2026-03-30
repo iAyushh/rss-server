@@ -255,7 +255,7 @@ model ContentType {
   files        FileAsset[]
   metadata     ContentMetadata[]
 
-  // Full Text Search column
+ 
   searchVector Unsupported("tsvector")? @map("search_vector")
 
   @@unique([slug, contentYear])

@@ -281,11 +281,40 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
+    
+    const subcategory = await this.prisma.subcategory.findUnique({
+      where: { id: subcategoryId },
+      include: {
+        translations: true,
+      },
+    });
+
+    const subcategoryNames =
+      subcategory?.translations.map(t => t.name) || [];
+
     const where: Prisma.FileAssetWhereInput = {
       ...(type && { fileType: type }),
-      contentType: {
-        subcategoryId,
-      },
+
+      OR: [
+      
+        {
+          contentType: {
+            subcategoryId,
+          },
+        },
+
+        
+        {
+          metadata: {
+            some: {
+              key: 'subcategory',
+              value: {
+                in: subcategoryNames,
+              },
+            },
+          },
+        },
+      ],
     };
 
     const [files, total] = await Promise.all([
@@ -303,14 +332,16 @@ export class FileService {
         },
         skip,
         take,
-        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
+        orderBy: [{ contentYear: 'desc' }, { updatedAt: 'desc' }],
       }),
       this.prisma.fileAsset.count({ where }),
     ]);
 
     return {
-      files: files.map((f) => this.formatFile(f, lang)),
+      data: files.map((f) => this.formatFile(f, lang)),
       total,
+      skip,
+      take,
     };
   }
 
