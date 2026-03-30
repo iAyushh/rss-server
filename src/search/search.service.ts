@@ -37,19 +37,11 @@ export class SearchService {
       return [];
     }
 
+
     const parsed = this.parseSearchQuery(query);
 
-    const trimmed = query?.trim() ?? '';
-    const isNumeric = /^\d+$/.test(trimmed);
-
-    let yearLike: string | null = null;
-
-    if (isNumeric) {
-      yearLike = `%${trimmed}%`;
-    }
-
-    const searchTerm = isNumeric ? null : parsed.keyword || null;
-
+    const yearLike = parsed.year ? `%${parsed.year}%` : null;
+    const searchTerm = parsed.keyword || null;
     if (!searchTerm && !yearLike && !parsed.year) {
       return [];
     }
@@ -118,7 +110,13 @@ SELECT
   'content' AS type,
   ct.id,
   ct.slug,
-  ct.content_year AS year,
+
+  (
+    SELECT MAX(f2.content_year)
+    FROM file_asset f2
+    WHERE f2.content_type_id = ct.id
+  ) AS year,
+
   (
     SELECT name
     FROM content_type_translation
@@ -129,16 +127,25 @@ SELECT
       (language_code = 'hi') DESC
     LIMIT 1
   ) AS title,
+
   ts_rank(
     COALESCE(ct.search_vector,''),
     to_tsquery('simple', (${searchTerm})::text || ':*')
   ) AS rank
+
 FROM content_type ct
+
 WHERE
 (
   (${yearLike})::text IS NULL
-  OR ct.content_year::text LIKE ${yearLike}
+  OR EXISTS (
+    SELECT 1
+    FROM file_asset f2
+    WHERE f2.content_type_id = ct.id
+    AND f2.content_year::text LIKE ${yearLike}
+  )
 )
+
 AND (
   (${searchTerm})::text IS NULL
   OR ct.search_vector @@ to_tsquery('simple', (${searchTerm})::text || ':*')
@@ -179,14 +186,16 @@ AND (
 
 ) results
 
-ORDER BY year DESC NULLS LAST, rank DESC
+ORDER BY
+  rank DESC,
+  year DESC NULLS LAST
 LIMIT ${take} OFFSET ${skip}
 `,
     );
   }
 
 
-  
+
 
   async searchFiles(
     search?: string,
