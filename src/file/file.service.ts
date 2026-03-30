@@ -345,6 +345,91 @@ export class FileService {
     };
   }
 
+
+async getFileIndex(
+  groupBy: 'year' | 'contentType' | 'category',
+  lang: string,
+) {
+  
+  if (groupBy === 'year') {
+    const result = await this.prisma.fileAsset.groupBy({
+      by: ['contentYear'],
+      _count: { id: true },
+      orderBy: { contentYear: 'desc' },
+    });
+
+    return {
+      data: result.map((r) => ({
+        year: r.contentYear,
+        count: r._count.id,
+      })),
+    };
+  }
+
+  if (groupBy === 'contentType') {
+    const contentTypes = await this.prisma.contentType.findMany({
+      include: {
+        translations: true,
+        _count: {
+          select: { files: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      data: contentTypes.map((ct) => {
+        const t =
+          ct.translations.find((tr) => tr.languageCode === lang) ??
+          ct.translations[0];
+
+        return {
+          id: ct.id,
+          name: t?.name,
+          count: ct._count.files,
+        };
+      }),
+    };
+  }
+
+
+  if (groupBy === 'category') {
+    const categories = await this.prisma.category.findMany({
+      include: {
+        translations: true,
+        contentTypes: {
+          include: {
+            _count: {
+              select: { files: true },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      data: categories.map((cat) => {
+        const t =
+          cat.translations.find((tr) => tr.languageCode === lang) ??
+          cat.translations[0];
+
+        const totalFiles = cat.contentTypes.reduce(
+          (sum, ct) => sum + ct._count.files,
+          0,
+        );
+
+        return {
+          id: cat.id,
+          name: t?.name,
+          count: totalFiles,
+        };
+      }),
+    };
+  }
+
+  return { data: [] };
+}
+
   async update(fileId: number, dto: any) {
     const file = await this.prisma.fileAsset.findUnique({
       where: { id: fileId },

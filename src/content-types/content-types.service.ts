@@ -8,7 +8,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
 import { I18nService } from 'nestjs-i18n';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import slugify from 'slugify';
 import { nanoid } from 'nanoid';
 import { generateSlug } from '@Common';
 
@@ -188,9 +187,13 @@ WHERE ct.id = ${content.id};
     const content = await this.prisma.contentType.findFirst({
       where: {
         slug: contentSlug,
-        contentYear: year,
         category: {
           slug: categorySlug,
+        },
+        files: {
+          some: {
+            contentYear: year,
+          },
         },
       },
       include: {
@@ -198,6 +201,9 @@ WHERE ct.id = ${content.id};
         category: true,
         subcategory: true,
         files: {
+          where: {
+            contentYear: year,
+          },
           include: {
             translations: true,
             metadata: true,
