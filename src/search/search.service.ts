@@ -37,11 +37,19 @@ export class SearchService {
       return [];
     }
 
-
     const parsed = this.parseSearchQuery(query);
 
-    const yearLike = parsed.year ? `%${parsed.year}%` : null;
-    const searchTerm = parsed.keyword || null;
+    const trimmed = query?.trim() ?? '';
+    const isNumeric = /^\d+$/.test(trimmed);
+
+    let yearLike: string | null = null;
+
+    if (isNumeric) {
+      yearLike = `%${trimmed}%`;
+    }
+
+    const searchTerm = isNumeric ? null : parsed.keyword || null;
+
     if (!searchTerm && !yearLike && !parsed.year) {
       return [];
     }
@@ -183,7 +191,7 @@ LIMIT ${take} OFFSET ${skip}
   }
 
 
-
+  
 
   async searchFiles(
     search?: string,
