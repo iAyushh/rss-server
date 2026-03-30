@@ -19,6 +19,7 @@ export const storageConfigFactory = registerAs('storage', () => ({
     '.aac',
     '.ogg',
     '.flac',
+    '.m4a',
     '.mp4',
     '.webm',
     '.mov',
