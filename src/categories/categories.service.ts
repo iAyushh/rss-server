@@ -68,7 +68,6 @@ export class CategoryService {
 
     }
 
-
     else {
       slug = `category-${nanoid(5)}`;
     }
@@ -78,7 +77,7 @@ export class CategoryService {
         data: {
           slug,
           translations: {
-            create: dto.translations.map((t)=>({
+            create: dto.translations.map((t) => ({
               ...t,
               name: t.name.trim().normalize('NFC'),
             }))

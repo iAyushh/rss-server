@@ -186,6 +186,8 @@ LIMIT ${take} OFFSET ${skip}
   }
 
 
+  
+
   async searchFiles(
     search?: string,
     languageCode?: string,
@@ -211,7 +213,6 @@ LIMIT ${take} OFFSET ${skip}
           },
         }),
       },
-
 
       select: {
         id: true,
@@ -320,8 +321,6 @@ LIMIT ${take} OFFSET ${skip}
         url: file.url,
         year: file.contentYear,
         createdAt: file.createdAt,
-
-
         contentType: contentTypeTranslation?.name || null,
         category: categoryTranslation?.name || null,
         subcategory: subcategoryTranslation?.name || null,

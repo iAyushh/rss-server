@@ -29,7 +29,7 @@ import { UpdateFileRequestDto } from './dto';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) {}
+  constructor(private readonly fileService: FileService) { }
 
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
@@ -63,6 +63,25 @@ export class FileController {
       take: pagination?.take,
       lang,
     });
+  }
+
+
+
+  @Get('index')
+  @ApiQuery({
+    name: 'groupBy',
+    required: true,
+    enum: ['year', 'contentType', 'category'],
+  })
+  @ApiQuery({ name: 'lang', required: false, type: String })
+  async getFileIndex(
+    @Query('groupBy') groupBy: 'year' | 'contentType' | 'category',
+    @Query('lang') queryLang?: string,
+    @I18nLang() i18nLang?: string,
+  ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+
+    return this.fileService.getFileIndex(groupBy, lang);
   }
 
   @Get('content-types/:id')
