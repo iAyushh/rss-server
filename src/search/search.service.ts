@@ -13,7 +13,7 @@ export class SearchService {
     const keywords: string[] = [];
 
     for (const token of tokens) {
-      if (/^\d{4}$/.test(token)) {
+      if (/^\d+$/.test(token)) {
         year = Number(token);
       } else {
         keywords.push(token);
@@ -40,7 +40,19 @@ export class SearchService {
 
     const parsed = this.parseSearchQuery(query);
 
-    const yearLike = parsed.year ? `%${parsed.year}%` : null;
+    let yearLike: string | null = null;
+
+    if (parsed.year !== undefined) {
+      const yearStr = parsed.year.toString();
+
+      if (yearStr.length === 4) {
+        // exact year
+        yearLike = `${yearStr}`;
+      } else {
+        // partial year → flexible match
+        yearLike = `%${yearStr}%`;
+      }
+    }
     const searchTerm = parsed.keyword || null;
     if (!searchTerm && !yearLike && !parsed.year) {
       return [];
@@ -177,7 +189,13 @@ FROM file_asset f
 WHERE
 (
   (${yearLike})::text IS NULL
-  OR f.content_year::text LIKE ${yearLike}
+  OR (
+  (${yearLike})::text IS NULL
+  OR (
+    LENGTH(f.content_year::text) = 4
+    AND f.content_year::text LIKE ${yearLike}
+  )
+)
 )
 AND (
   (${searchTerm})::text IS NULL
