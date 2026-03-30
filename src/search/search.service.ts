@@ -13,7 +13,7 @@ export class SearchService {
     const keywords: string[] = [];
 
     for (const token of tokens) {
-      if (/^\d+$/.test(token)) {
+      if (/^\d{4}$/.test(token)) {
         year = Number(token);
       } else {
         keywords.push(token);
@@ -40,19 +40,7 @@ export class SearchService {
 
     const parsed = this.parseSearchQuery(query);
 
-    let yearLike: string | null = null;
-
-    if (parsed.year !== undefined) {
-      const yearStr = parsed.year.toString();
-
-      if (yearStr.length === 4) {
-        // exact year
-        yearLike = `${yearStr}`;
-      } else {
-        // partial year → flexible match
-        yearLike = `%${yearStr}%`;
-      }
-    }
+    const yearLike = parsed.year ? `%${parsed.year}%` : null;
     const searchTerm = parsed.keyword || null;
     if (!searchTerm && !yearLike && !parsed.year) {
       return [];
@@ -122,13 +110,7 @@ SELECT
   'content' AS type,
   ct.id,
   ct.slug,
-
-  (
-    SELECT MAX(f2.content_year)
-    FROM file_asset f2
-    WHERE f2.content_type_id = ct.id
-  ) AS year,
-
+  NULL::int AS year, 
   (
     SELECT name
     FROM content_type_translation
@@ -139,14 +121,11 @@ SELECT
       (language_code = 'hi') DESC
     LIMIT 1
   ) AS title,
-
   ts_rank(
     COALESCE(ct.search_vector,''),
     to_tsquery('simple', (${searchTerm})::text || ':*')
   ) AS rank
-
 FROM content_type ct
-
 WHERE
 (
   (${yearLike})::text IS NULL
@@ -157,7 +136,6 @@ WHERE
     AND f2.content_year::text LIKE ${yearLike}
   )
 )
-
 AND (
   (${searchTerm})::text IS NULL
   OR ct.search_vector @@ to_tsquery('simple', (${searchTerm})::text || ':*')
@@ -189,13 +167,7 @@ FROM file_asset f
 WHERE
 (
   (${yearLike})::text IS NULL
-  OR (
-  (${yearLike})::text IS NULL
-  OR (
-    LENGTH(f.content_year::text) = 4
-    AND f.content_year::text LIKE ${yearLike}
-  )
-)
+  OR f.content_year::text LIKE ${yearLike}
 )
 AND (
   (${searchTerm})::text IS NULL
@@ -204,9 +176,7 @@ AND (
 
 ) results
 
-ORDER BY
-  rank DESC,
-  year DESC NULLS LAST
+ORDER BY year DESC NULLS LAST, rank DESC
 LIMIT ${take} OFFSET ${skip}
 `,
     );
