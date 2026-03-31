@@ -8,6 +8,7 @@ import {
   Query,
   Body,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileService } from './file.service';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -22,6 +23,7 @@ import {
 } from '@Common';
 import { I18nLang } from 'nestjs-i18n';
 import { UpdateFileRequestDto } from './dto';
+import { AppCacheInterceptor } from 'src/app-cache.interceptor';
 
 @ApiBearerAuth()
 @ApiTags('Files')
@@ -31,6 +33,8 @@ import { UpdateFileRequestDto } from './dto';
 export class FileController {
   constructor(private readonly fileService: FileService) { }
 
+
+  @UseInterceptors(AppCacheInterceptor)
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
   @ApiQuery({ name: 'type', required: false, enum: FileType })
@@ -84,6 +88,8 @@ export class FileController {
     return this.fileService.getFileIndex(groupBy, lang);
   }
 
+
+  @UseInterceptors(AppCacheInterceptor)
   @Get('content-types/:id')
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
@@ -106,6 +112,8 @@ export class FileController {
     });
   }
 
+
+  @UseInterceptors(AppCacheInterceptor)
   @Get('category/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
@@ -126,6 +134,8 @@ export class FileController {
     });
   }
 
+
+  @UseInterceptors(AppCacheInterceptor)
   @Get('subcategory/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
@@ -145,6 +155,10 @@ export class FileController {
       lang,
     });
   }
+
+
+
+  @UseInterceptors(AppCacheInterceptor)
   @Get('list/content-types')
   @ApiQuery({ name: 'lang', required: false, type: String })
   getAllContentTypes(
