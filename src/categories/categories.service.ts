@@ -116,46 +116,54 @@ export class CategoryService {
   }
 
   async findAll(lang: string, skip = 0, take = 20) {
-    const cacheKey = `categories:${lang}`;
+  const cacheKey = `categories:${lang}:${skip}:${take}`;
 
-    const cached = await this.cache.get(cacheKey);
-    if (cached) return cached;
-
-    const [categories, total] = await Promise.all([
-      this.prisma.category.findMany({
-        include: { translations: true },
-        orderBy: { createdAt: 'asc' },
-        skip,
-        take,
-      }),
-      this.prisma.category.count(),
-    ]);
-
-    const data = categories.map((cat) => {
-      let translation = cat.translations.find(
-        (t: CategoryTranslation) => t.languageCode === lang,
-      );
-      if (!translation && lang !== 'hi') {
-        translation = cat.translations.find(
-          (t: CategoryTranslation) => t.languageCode === 'hi',
-        );
-      }
-      if (!translation) {
-        translation = cat.translations[0];
-      }
-
-      return {
-        id: cat.id,
-        slug: cat.slug,
-        lang: translation.languageCode,
-        name: translation.name,
-        description: translation.description,
-      };
-    });
-    const result = { data, total };
-    await this.cache.set(cacheKey, result, 600);
-    return result;
+  const cached = await this.cache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
+
+  const [categories, total] = await Promise.all([
+    this.prisma.category.findMany({
+      include: { translations: true },
+      orderBy: { createdAt: 'asc' },
+      skip,
+      take,
+    }),
+    this.prisma.category.count(),
+  ]);
+
+  const data = categories.map((cat) => {
+    let translation = cat.translations.find(
+      (t: CategoryTranslation) => t.languageCode === lang,
+    );
+
+    if (!translation && lang !== 'hi') {
+      translation = cat.translations.find(
+        (t: CategoryTranslation) => t.languageCode === 'hi',
+      );
+    }
+
+    if (!translation) {
+      translation = cat.translations[0];
+    }
+
+    return {
+      id: cat.id,
+      slug: cat.slug,
+      lang: translation.languageCode,
+      name: translation.name,
+      description: translation.description,
+    };
+  });
+
+  const result = { data, total };
+
+
+  await this.cache.set(cacheKey, result, 600*1000);
+
+  return result;
+}
 
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
     const category = await this.prisma.category.findUnique({

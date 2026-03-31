@@ -9,7 +9,6 @@ import {
   Delete,
   UseGuards,
   Query,
-  UseInterceptors,
 } from '@nestjs/common';
 import { ContentTypeService } from './content-types.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
@@ -22,8 +21,7 @@ import {
   UserType,
 } from '@Common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { CacheInterceptor } from '@nestjs/cache-manager';
-import { AppCacheInterceptor } from 'src/app-cache.interceptor';
+
 
 @ApiBearerAuth()
 @ApiTags('Content-Types')
@@ -37,7 +35,7 @@ export class ContentTypeController {
     return this.contentTypeService.create(dto);
   }
 
-  @UseInterceptors(AppCacheInterceptor)
+  
   @Get()
   @ApiQuery({ name: 'categoryId', required: false, type: Number })
   @ApiQuery({ name: 'subcategoryId', required: false, type: Number })

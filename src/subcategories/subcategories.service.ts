@@ -154,7 +154,7 @@ WHERE s.id = ${subcategory.id};
         description: translation.description,
       };
     });
-    await this.cache.set(cacheKey, result, 600);
+    await this.cache.set(cacheKey, result, 600 * 1000);
     return { result, total };
   }
 
