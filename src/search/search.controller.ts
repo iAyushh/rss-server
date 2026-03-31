@@ -1,16 +1,14 @@
-import { Controller, Get, Param, Query, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Param, Query} from '@nestjs/common';
 import { SearchService } from './search.service';
 import { SearchablePaginatedDto } from '@Common';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { AppCacheInterceptor } from 'src/app-cache.interceptor';
+
 
 @ApiBearerAuth()
 @Controller('search')
 export class SearchController {
   constructor(private readonly searchService: SearchService) { }
 
-
-  @UseInterceptors(AppCacheInterceptor)
   @Get()
   async globalSearch(@Query() dto: SearchablePaginatedDto) {
     const skip = Number(dto.skip ?? 0);
@@ -29,7 +27,6 @@ export class SearchController {
     );
   }
 
-  @UseInterceptors(AppCacheInterceptor)
   @Get('files')
   async searchFiles(@Query() dto: SearchablePaginatedDto) {
     const skip = Number(dto.skip ?? 0);

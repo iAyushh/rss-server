@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Post,
   UploadedFiles,
   UseGuards,
@@ -17,6 +18,8 @@ import {
   RolesGuard,
   UserType,
 } from '@Common';
+import { AppCacheInterceptor } from 'src/app-cache.interceptor';
+import { CacheTTL } from '@nestjs/cache-manager';
 
 @ApiBearerAuth()
 @ApiTags('Ingestion')
@@ -24,7 +27,7 @@ import {
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('ingestion')
 export class IngestionController {
-  constructor(private readonly ingestionService: IngestionService) {}
+  constructor(private readonly ingestionService: IngestionService) { }
 
   @Post()
   @ApiConsumes('multipart/form-data')

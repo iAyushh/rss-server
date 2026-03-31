@@ -16,7 +16,6 @@ import { I18nLang } from 'nestjs-i18n';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessGuard, JwtAuthGuard, RolesGuard, Roles } from '@Common';
 import { UserType } from '@Common';
-import { AppCacheInterceptor } from 'src/app-cache.interceptor';
 
 @ApiBearerAuth()
 @ApiTags('Category')
@@ -31,8 +30,6 @@ export class CategoryController {
     return this.categoryService.create(dto, lang);
   }
 
-
-  @UseInterceptors(AppCacheInterceptor)
   @Get()
   findAll(
     @I18nLang() lang: string,
