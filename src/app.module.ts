@@ -18,6 +18,9 @@ import { ContentTypesModule } from './content-types/content-types.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { FileModule } from './file/file.module';
 import { SearchModule } from './search/search.module';
+import { redisStore } from 'cache-manager-redis-store';
+import { appConfigFactory } from '@Config';
+import { ConfigType } from '@nestjs/config';
 
 const redisEnabled = process.env.REDIS_ENABLED === 'true';
 
@@ -40,11 +43,26 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
       inject: [StorageService],
     }),
 
-    CacheModule.register({
+    CacheModule.registerAsync({
       isGlobal: true,
-      ttl: 600,
-      max: 1000,
+      useFactory: (config: ConfigType<typeof appConfigFactory>) => {
+        const baseConfig = {
+          ttl: config.cacheTtl,
+        };
+
+        if (config.redisEnabled) {
+          return {
+            ...baseConfig,
+            store: redisStore as any,
+            url: config.redisUrl,
+          };
+        }
+
+        return baseConfig;
+      },
+      inject: [appConfigFactory.KEY],
     }),
+
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     CommonModule,
@@ -68,4 +86,4 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }
