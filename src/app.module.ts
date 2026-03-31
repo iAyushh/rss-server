@@ -44,9 +44,9 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
 
     CacheModule.register({
       isGlobal: true,
-      stores: [
-        new KeyvRedis('redis://localhost:6379'),
-      ],
+     stores: process.env.REDIS_URI
+    ? [new KeyvRedis(process.env.REDIS_URI)]
+    : undefined,
       ttl: 600*1000,
     }),
 
