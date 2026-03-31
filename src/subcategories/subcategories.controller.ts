@@ -8,6 +8,7 @@ import {
   Patch,
   UseGuards,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { I18nLang } from 'nestjs-i18n';
 import { SubcategoriesService } from './subcategories.service';
@@ -18,6 +19,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessGuard, JwtAuthGuard, RolesGuard, Roles } from '@Common';
 import { UserType } from '@Common';
+import { AppCacheInterceptor } from 'src/app-cache.interceptor';
 
 @ApiBearerAuth()
 @ApiTags('Subcategory')
@@ -25,13 +27,15 @@ import { UserType } from '@Common';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('subcategories')
 export class SubcategoriesController {
-  constructor(private readonly subcategoriesService: SubcategoriesService) {}
+  constructor(private readonly subcategoriesService: SubcategoriesService) { }
 
   @Post()
   create(@Body() dto: CreateSubcategoryRequestDto, @I18nLang() lang: string) {
     return this.subcategoriesService.create(dto, lang);
   }
 
+
+  @UseInterceptors(AppCacheInterceptor)
   @Get('category/:categoryId')
   findByCategory(
     @Param('categoryId') categoryId: string,
