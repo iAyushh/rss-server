@@ -26,28 +26,25 @@ export class SearchController {
       extractedYear,
     );
   }
+@Get('files')
+@ApiQuery({
+  name: 'sortBy',
+  required: false,
+  enum: ['updatedAt', 'fileSize', 'originalName'],
+})
+@ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+async searchFiles(@Query() dto: SearchablePaginatedDto) {
+  const skip = Number(dto.skip ?? 0);
+  const take = Number(dto.take ?? 20);
 
-  @Get('files')
-  @ApiQuery({
-    name: 'sortBy',
-    required: false,
-    enum: ['updatedAt', 'fileSize', 'originalName'],
-  })
-  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
-  async searchFiles(@Query() dto: SearchablePaginatedDto, @Query('sortBy') sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
-    @Query('order') order?: 'asc' | 'desc',) {
-
-    const skip = Number(dto.skip ?? 0);
-    const take = Number(dto.take ?? 20);
-
-    return this.searchService.searchFiles(
-      dto.search ?? '',
-      dto.languageCode ?? 'hi',
-      skip,
-      take,
-      dto.year ? Number(dto.year) : undefined,
-      sortBy,
-      order,
-    );
-  }
+  return this.searchService.searchFiles(
+    dto.search ?? '',
+    dto.languageCode ?? 'hi',
+    skip,
+    take,
+    dto.year ? Number(dto.year) : undefined,
+    dto.sortBy,   
+    dto.order,    
+  );
+}
 }
