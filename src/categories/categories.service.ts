@@ -22,8 +22,15 @@ export class CategoryService {
   ) { }
 
   private async invalidateCache() {
-    await this.cache.del('categories:hi');
-    await this.cache.del('categories:en');
+   const store = (this.cache as any).store;
+
+  if (store?.keys) {
+    const keys = await store.keys('categories:*');
+
+    if (keys.length) {
+      await Promise.all(keys.map((key: string) => this.cache.del(key)));
+    }
+  }
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
@@ -294,6 +301,7 @@ export class CategoryService {
     }
 
     await this.prisma.category.delete({ where: { id } });
+
     await this.invalidateCache();
 
     return {
