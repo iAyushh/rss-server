@@ -1,3 +1,5 @@
+import e from 'express';
+
 export * from './app.config';
 export * from './admin.config';
 export * from './user.config';

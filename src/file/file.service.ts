@@ -32,9 +32,9 @@ export class FileService {
     private readonly i18n: I18nService,
   ) { }
 
-  getPublicUrl(storageKey: string) {
-    return `${process.env.APP_URL ?? ''}/uploads/${storageKey}`;
-  }
+   getPublicUrl(storageKey: string) {
+  return storageKey;
+}
 
   private resolveTranslation(
     translations: FileTranslationLite[] = [],

@@ -37,7 +37,7 @@ export class IngestionService {
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
     let metadata: Record<string, any> = {};
 
-    // ✅ parse optional metadata safely
+  
     if (dto.metadata) {
       try {
         metadata = JSON.parse(dto.metadata);
@@ -60,16 +60,17 @@ export class IngestionService {
 
     this.validateFiles(files, dto.type, dto.lang ?? 'hi');
 
-    const normalizedFiles = files.map((file) => ({
-      originalName: file.originalname,
-      storageKey: file.filename,
-      mimeType: file.mimetype,
-      extension: path.extname(file.originalname),
-      fileSize: file.size,
-      fileType: dto.type,
-      displayName: dto.displayName || file.originalname,
-      description: dto.description ?? null,
-    }));
+  const normalizedFiles = files.map((file) => ({
+  originalName: file.originalname,
+  storageKey: file.path, 
+  url: file.path,       
+  mimeType: file.mimetype,
+  extension: path.extname(file.originalname),
+  fileSize: file.size,
+  fileType: dto.type,
+  displayName: dto.displayName || file.originalname,
+  description: dto.description ?? null,
+}));
 
     const assets = await this.prisma.$transaction(async (tx) => {
       const lang = dto.lang ?? 'hi';
@@ -81,7 +82,7 @@ export class IngestionService {
         const fileUrl = `${baseUrl}/${file.storageKey}`;
         const finalType = dto.type ?? FileType.OTHER;
 
-        // ✅ Create file asset
+        
         const asset = await tx.fileAsset.create({
           data: {
             contentTypeId: dto.contentTypeId,
@@ -92,11 +93,11 @@ export class IngestionService {
             fileSize: file.fileSize,
             fileType: finalType,
             contentYear: dto.contentYear,
-            url: fileUrl,
+            url: file.url,
           },
         });
 
-        // ✅ Translation
+        
         await tx.fileTranslation.create({
           data: {
             fileId: asset.id,
@@ -106,10 +107,10 @@ export class IngestionService {
           },
         });
 
-        // ✅ Metadata building (CLEAN)
+        
         const metadataRows: { key: string; value: string }[] = [];
 
-        // 🔥 CORE FIX: store IDs (NOT names)
+        
         if (dto.categoryId) {
           metadataRows.push({
             key: 'categoryId',
@@ -124,12 +125,12 @@ export class IngestionService {
           });
         }
 
-        // ✅ Optional extra metadata (safe merge)
+        
         for (const [key, value] of Object.entries(metadata)) {
           if (
             value !== undefined &&
             value !== null &&
-            !['category', 'subcategory'].includes(key) // ❌ prevent old buggy keys
+            !['category', 'subcategory'].includes(key) 
           ) {
             metadataRows.push({
               key,
@@ -138,7 +139,7 @@ export class IngestionService {
           }
         }
 
-        // ✅ Insert metadata
+        
         if (metadataRows.length > 0) {
           await tx.fileMetadata.createMany({
             data: metadataRows.map((m) => ({
@@ -155,7 +156,7 @@ export class IngestionService {
       return createdAssets;
     });
 
-    // ✅ Search vector update
+    
     const ids = assets.map((a) => a.id);
 
     if (ids.length > 0) {
