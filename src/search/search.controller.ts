@@ -1,7 +1,7 @@
-import { Controller, Get, Param, Query} from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { SearchablePaginatedDto } from '@Common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 
 @ApiBearerAuth()
@@ -28,7 +28,15 @@ export class SearchController {
   }
 
   @Get('files')
-  async searchFiles(@Query() dto: SearchablePaginatedDto) {
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['updatedAt', 'fileSize', 'originalName'],
+  })
+  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  async searchFiles(@Query() dto: SearchablePaginatedDto, @Query('sortBy') sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
+    @Query('order') order?: 'asc' | 'desc',) {
+
     const skip = Number(dto.skip ?? 0);
     const take = Number(dto.take ?? 20);
 
@@ -38,6 +46,8 @@ export class SearchController {
       skip,
       take,
       dto.year ? Number(dto.year) : undefined,
+      sortBy,
+      order,
     );
   }
 }

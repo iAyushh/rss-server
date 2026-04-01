@@ -66,11 +66,11 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
     SearchModule,
   ],
   controllers: [AppController],
-  providers: [
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: AppCacheInterceptor,
-    },
-  ],
+  // providers: [
+  //   {
+  //     provide: APP_INTERCEPTOR,
+  //     useClass: AppCacheInterceptor,
+  //   },
+  // ],
 })
 export class AppModule { }

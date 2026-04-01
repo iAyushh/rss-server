@@ -18,8 +18,6 @@ import {
   RolesGuard,
   UserType,
 } from '@Common';
-import { AppCacheInterceptor } from 'src/app-cache.interceptor';
-import { CacheTTL } from '@nestjs/cache-manager';
 
 @ApiBearerAuth()
 @ApiTags('Ingestion')
