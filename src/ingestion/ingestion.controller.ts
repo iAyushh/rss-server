@@ -37,10 +37,15 @@ export class IngestionController {
         contentTypeId: { type: 'number', example: 12 },
         contentYear: { type: 'number', example: 2024 },
 
+
+        categoryId: { type: 'number', example: 4 },
+        subcategoryId: { type: 'number', example: 10 },
+
         lang: { type: 'string', example: 'hi' },
         displayName: { type: 'string', example: 'Annual Report PDF' },
 
         description: { type: 'string', example: 'Organization report' },
+
         type: {
           type: 'string',
           enum: [
@@ -55,10 +60,13 @@ export class IngestionController {
             'OTHER',
           ],
         },
+
+
         metadata: {
           type: 'string',
-          example: '{"category":"Documents","subcategory":"Reports"}',
+          example: '{"customField":"value"}',
         },
+
         files: {
           type: 'array',
           items: { type: 'string', format: 'binary' },

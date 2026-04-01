@@ -16,12 +16,12 @@ export class IngestionService {
   ) { }
 
 
-  private validateFiles(files: Express.Multer.File[],  type: FileType | undefined, lang: string) {
+  private validateFiles(files: Express.Multer.File[], type: FileType | undefined, lang: string) {
 
     if (!type) {
-    console.log('No file type provided, skipping validation');
-    return;
-  }
+      console.log('No file type provided, skipping validation');
+      return;
+    }
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
     if (!allowedMimes.length) return;
 
@@ -35,8 +35,9 @@ export class IngestionService {
   }
 
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
-    let metadata: any = {};
+    let metadata: Record<string, any> = {};
 
+    // ✅ parse optional metadata safely
     if (dto.metadata) {
       try {
         metadata = JSON.parse(dto.metadata);
@@ -72,34 +73,15 @@ export class IngestionService {
 
     const assets = await this.prisma.$transaction(async (tx) => {
       const lang = dto.lang ?? 'hi';
-
-      let categorySlug: string | undefined;
-      let subcategorySlug: string | undefined;
-
-      if (dto.categoryId) {
-        const category = await tx.category.findUnique({
-          where: { id: dto.categoryId },
-          select: { slug: true },
-        });
-        categorySlug = category?.slug;
-      }
-
-      if (dto.subcategoryId) {
-        const subcategory = await tx.subcategory.findUnique({
-          where: { id: dto.subcategoryId },
-          select: { slug: true },
-        });
-        subcategorySlug = subcategory?.slug;
-      }
+      const baseUrl = process.env.APP_URL + '/uploads';
 
       const createdAssets = [];
-      const baseUrl = process.env.APP_URL + '/uploads';
 
       for (const file of normalizedFiles) {
         const fileUrl = `${baseUrl}/${file.storageKey}`;
+        const finalType = dto.type ?? FileType.OTHER;
 
-       const finalType = dto.type ?? FileType.OTHER;
-
+        // ✅ Create file asset
         const asset = await tx.fileAsset.create({
           data: {
             contentTypeId: dto.contentTypeId,
@@ -114,6 +96,7 @@ export class IngestionService {
           },
         });
 
+        // ✅ Translation
         await tx.fileTranslation.create({
           data: {
             fileId: asset.id,
@@ -123,25 +106,39 @@ export class IngestionService {
           },
         });
 
+        // ✅ Metadata building (CLEAN)
         const metadataRows: { key: string; value: string }[] = [];
 
-        const categoryValue = metadata.category ?? categorySlug;
-        const subcategoryValue = metadata.subcategory ?? subcategorySlug;
-
-        if (categoryValue) {
+        // 🔥 CORE FIX: store IDs (NOT names)
+        if (dto.categoryId) {
           metadataRows.push({
-            key: 'category',
-            value: categoryValue,
+            key: 'categoryId',
+            value: String(dto.categoryId),
           });
         }
 
-        if (subcategoryValue) {
+        if (dto.subcategoryId) {
           metadataRows.push({
-            key: 'subcategory',
-            value: subcategoryValue,
+            key: 'subcategoryId',
+            value: String(dto.subcategoryId),
           });
         }
 
+        // ✅ Optional extra metadata (safe merge)
+        for (const [key, value] of Object.entries(metadata)) {
+          if (
+            value !== undefined &&
+            value !== null &&
+            !['category', 'subcategory'].includes(key) // ❌ prevent old buggy keys
+          ) {
+            metadataRows.push({
+              key,
+              value: String(value),
+            });
+          }
+        }
+
+        // ✅ Insert metadata
         if (metadataRows.length > 0) {
           await tx.fileMetadata.createMany({
             data: metadataRows.map((m) => ({
@@ -158,8 +155,7 @@ export class IngestionService {
       return createdAssets;
     });
 
-
-
+    // ✅ Search vector update
     const ids = assets.map((a) => a.id);
 
     if (ids.length > 0) {
