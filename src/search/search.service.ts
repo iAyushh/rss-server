@@ -191,7 +191,7 @@ LIMIT ${take} OFFSET ${skip}
   }
 
 
-  
+
 
   async searchFiles(
     search?: string,
@@ -199,7 +199,21 @@ LIMIT ${take} OFFSET ${skip}
     skip = 0,
     take = 20,
     year?: number,
+    sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
+    order?: 'asc' | 'desc',
   ) {
+
+
+    const sortFieldMap = {
+      updatedAt: 'createdAt',
+      fileSize: 'fileSize',
+      originalName: 'originalName',
+    } as const;
+
+    const orderBy: Prisma.FileAssetOrderByWithRelationInput = sortBy
+      ? { [sortFieldMap[sortBy]]: (order ?? 'desc') as Prisma.SortOrder }
+      : { createdAt: 'desc' };
+
 
     const lang = languageCode || 'hi';
     let files = await this.prisma.fileAsset.findMany({
@@ -243,7 +257,7 @@ LIMIT ${take} OFFSET ${skip}
         },
       },
 
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip,
       take,
     });
@@ -288,7 +302,7 @@ LIMIT ${take} OFFSET ${skip}
           },
         },
 
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take,
       });
