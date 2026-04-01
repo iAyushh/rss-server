@@ -19,7 +19,6 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessGuard, JwtAuthGuard, RolesGuard, Roles } from '@Common';
 import { UserType } from '@Common';
-import { AppCacheInterceptor } from 'src/app-cache.interceptor';
 
 @ApiBearerAuth()
 @ApiTags('Subcategory')
@@ -35,7 +34,7 @@ export class SubcategoriesController {
   }
 
 
-  @UseInterceptors(AppCacheInterceptor)
+ 
   @Get('category/:categoryId')
   findByCategory(
     @Param('categoryId') categoryId: string,

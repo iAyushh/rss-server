@@ -22,15 +22,10 @@ export class CategoryService {
   ) { }
 
   private async invalidateCache() {
-   const store = (this.cache as any).store;
+    const currentVersion =
+      (await this.cache.get<number>('categories:version')) ?? 1;
 
-  if (store?.keys) {
-    const keys = await store.keys('categories:*');
-
-    if (keys.length) {
-      await Promise.all(keys.map((key: string) => this.cache.del(key)));
-    }
-  }
+    await this.cache.set('categories:version', currentVersion + 1);
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
@@ -123,54 +118,57 @@ export class CategoryService {
   }
 
   async findAll(lang: string, skip = 0, take = 20) {
-  const cacheKey = `categories:${lang}:${skip}:${take}`;
+    const version =
+      (await this.cache.get<number>('categories:version')) ?? 1;
 
-  const cached = await this.cache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
+    const cacheKey = `categories:${version}:${lang}:${skip}:${take}`;
 
-  const [categories, total] = await Promise.all([
-    this.prisma.category.findMany({
-      include: { translations: true },
-      orderBy: { createdAt: 'asc' },
-      skip,
-      take,
-    }),
-    this.prisma.category.count(),
-  ]);
+    const cached = await this.cache.get(cacheKey);
+    if (cached) {
+      console.log('== FROM CACHE ==');
+      return cached;
+    }
 
-  const data = categories.map((cat) => {
-    let translation = cat.translations.find(
-      (t: CategoryTranslation) => t.languageCode === lang,
-    );
+    const [categories, total] = await Promise.all([
+      this.prisma.category.findMany({
+        include: { translations: true },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take,
+      }),
+      this.prisma.category.count(),
+    ]);
 
-    if (!translation && lang !== 'hi') {
-      translation = cat.translations.find(
-        (t: CategoryTranslation) => t.languageCode === 'hi',
+    const data = categories.map((cat) => {
+      let translation = cat.translations.find(
+        (t: CategoryTranslation) => t.languageCode === lang,
       );
-    }
 
-    if (!translation) {
-      translation = cat.translations[0];
-    }
+      if (!translation && lang !== 'hi') {
+        translation = cat.translations.find(
+          (t: CategoryTranslation) => t.languageCode === 'hi',
+        );
+      }
 
-    return {
-      id: cat.id,
-      slug: cat.slug,
-      lang: translation.languageCode,
-      name: translation.name,
-      description: translation.description,
-    };
-  });
+      if (!translation) {
+        translation = cat.translations[0];
+      }
 
-  const result = { data, total };
+      return {
+        id: cat.id,
+        slug: cat.slug,
+        lang: translation.languageCode,
+        name: translation.name,
+        description: translation.description,
+      };
+    });
 
+    const result = { data, total };
 
-  await this.cache.set(cacheKey, result, 600*1000);
+    await this.cache.set(cacheKey, result, 600 * 1000);
 
-  return result;
-}
+    return result;
+  }
 
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
     const category = await this.prisma.category.findUnique({
