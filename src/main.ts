@@ -39,11 +39,11 @@ async function bootstrap() {
     appConfigFactory.KEY,
   );
 
-  app.use(express.json({ limit: '200mb' }));
-app.use(express.urlencoded({ limit: '200mb', extended: true }));
-  app.use(compression({ level: 1 }));
+//   app.use(express.json({ limit: '200mb' }));
+// app.use(express.urlencoded({ limit: '200mb', extended: true }));
+//   app.use(compression({ level: 1 }));
 
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

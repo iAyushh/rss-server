@@ -30,7 +30,7 @@ export class SearchController {
 @ApiQuery({
   name: 'sortBy',
   required: false,
-  enum: ['updatedAt', 'fileSize', 'originalName'],
+  enum: ['updatedAt', 'fileSize', 'originalName', 'name'],
 })
 @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
 async searchFiles(@Query() dto: SearchablePaginatedDto) {

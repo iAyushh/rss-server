@@ -6,6 +6,9 @@ import { FILE_TYPE_MIME_MAP } from '../common/constants/file-type-mime.map';
 import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
 import { I18nService } from 'nestjs-i18n';
+import cloudinary from 'src/configs/cloudinary.config';
+import streamifier from 'streamifier';
+import { Readable } from 'node:stream';
 
 @Injectable()
 export class IngestionService {
@@ -15,41 +18,73 @@ export class IngestionService {
     private readonly i18n: I18nService,
   ) { }
 
-private validateFiles(
-  files: Express.Multer.File[],
-  type: FileType | undefined,
-  lang: string,
-) {
-  if (!type) {
-    console.log('No file type provided, skipping validation');
-    return;
+
+  private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'rss-uploads',
+          resource_type: 'auto',
+        },
+        (error, result) => {
+          if (error) {
+            if ((error as any)?.http_code === 413) {
+              return reject(
+                new BadRequestException(
+                  'File too large. Max allowed size is 100MB',
+                ),
+              );
+            }
+            return reject(
+              new BadRequestException('Cloudinary upload failed'),
+            );
+          }
+          resolve(result?.secure_url || '');
+        },
+      );
+
+      const bufferStream = new Readable();
+      bufferStream.push(file.buffer);
+      bufferStream.push(null);
+      bufferStream.pipe(stream);
+    });
   }
 
-  const allowedMimes = FILE_TYPE_MIME_MAP[type];
-  if (allowedMimes?.length) {
+  private validateFiles(
+    files: Express.Multer.File[],
+    type: FileType | undefined,
+    lang: string,
+  ) {
+    if (!type) {
+      console.log('No file type provided, skipping validation');
+      return;
+    }
+
+    const allowedMimes = FILE_TYPE_MIME_MAP[type];
+    if (allowedMimes?.length) {
+      for (const file of files) {
+        if (!allowedMimes.includes(file.mimetype)) {
+          throw new BadRequestException(
+            this.i18n.t('common.errors.INVALID_FILE_TYPE', { lang }),
+          );
+        }
+      }
+    }
+
+
+    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+
     for (const file of files) {
-      if (!allowedMimes.includes(file.mimetype)) {
+      if (file.size > MAX_SIZE) {
         throw new BadRequestException(
-          this.i18n.t('common.errors.INVALID_FILE_TYPE', { lang }),
+          this.i18n.t('common.errors.FILE_TOO_LARGE', {
+            lang,
+            args: { max: '100MB' },
+          }) || 'File too large. Max allowed size is 100MB',
         );
       }
     }
   }
-
-  
-  const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-
-  for (const file of files) {
-    if (file.size > MAX_SIZE) {
-      throw new BadRequestException(
-        this.i18n.t('common.errors.FILE_TOO_LARGE', {
-          lang,
-          args: { max: '100MB' },
-        }) || 'File too large. Max allowed size is 100MB',
-      );
-    }
-  }
-}
 
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
     let metadata: Record<string, any> = {};
@@ -77,17 +112,33 @@ private validateFiles(
 
     this.validateFiles(files, dto.type, dto.lang ?? 'hi');
 
-    const normalizedFiles = files.map((file) => ({
-      originalName: file.originalname,
-      storageKey: file.path,
-      url: file.path,
-      mimeType: file.mimetype,
-      extension: path.extname(file.originalname),
-      fileSize: file.size,
-      fileType: dto.type,
-      displayName: dto.displayName || file.originalname,
-      description: dto.description ?? null,
-    }));
+    const normalizedFiles: {
+      originalName: string;
+      storageKey: string;
+      url: string;
+      mimeType: string;
+      extension: string;
+      fileSize: number;
+      fileType: FileType | undefined;
+      displayName: string;
+      description: string | null;
+    }[] = [];
+
+    for (const file of files) {
+      const url = await this.uploadToCloudinary(file);
+
+      normalizedFiles.push({
+        originalName: file.originalname,
+        storageKey: url,
+        url,
+        mimeType: file.mimetype,
+        extension: path.extname(file.originalname),
+        fileSize: file.size,
+        fileType: dto.type,
+        displayName: dto.displayName || file.originalname,
+        description: dto.description ?? null,
+      });
+    }
 
     const assets = await this.prisma.$transaction(async (tx) => {
 

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
-import { storage } from 'src/configs/cloudinary.storage';
+import * as multer from 'multer';
 import { MulterError } from 'multer';
 
 @Injectable()
@@ -16,9 +16,8 @@ export class StorageFilesInterceptor implements NestInterceptor {
 
   constructor() {
     const InterceptorClass = FilesInterceptor('files', 10, {
-      storage,
+      storage: multer.memoryStorage(), 
 
-      
       limits: {
         fileSize: 100 * 1024 * 1024, // 100MB
       },
@@ -34,7 +33,6 @@ export class StorageFilesInterceptor implements NestInterceptor {
     try {
       return await this.filesInterceptor.intercept(context, next);
     } catch (error) {
-      
       if (error instanceof MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
           throw new BadRequestException(
@@ -42,7 +40,6 @@ export class StorageFilesInterceptor implements NestInterceptor {
           );
         }
       }
-
       throw error;
     }
   }

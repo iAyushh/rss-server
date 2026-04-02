@@ -192,158 +192,155 @@ LIMIT ${take} OFFSET ${skip}
 
 
 
+async searchFiles(
+  search?: string,
+  languageCode?: string,
+  skip = 0,
+  take = 20,
+  year?: number,
+  sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name',
+  order?: 'asc' | 'desc',
+) {
+  const lang = languageCode || 'hi';
 
-  async searchFiles(
-    search?: string,
-    languageCode?: string,
-    skip = 0,
-    take = 20,
-    year?: number,
-    sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
-    order?: 'asc' | 'desc',
-  ) {
+  const sortFieldMap = {
+    updatedAt: 'createdAt',
+    fileSize: 'fileSize',
+    originalName: 'originalName',
+  } as const;
 
+  const isStringSort =
+    sortBy === 'originalName' || sortBy === 'name';
 
-    const sortFieldMap = {
-      updatedAt: 'createdAt',
-      fileSize: 'fileSize',
-      originalName: 'originalName',
-    } as const;
-
-    const orderBy: Prisma.FileAssetOrderByWithRelationInput = sortBy
+  const orderBy: Prisma.FileAssetOrderByWithRelationInput =
+    sortBy && !isStringSort
       ? { [sortFieldMap[sortBy]]: (order ?? 'desc') as Prisma.SortOrder }
       : { createdAt: 'desc' };
 
-
-    const lang = languageCode || 'hi';
-    let files = await this.prisma.fileAsset.findMany({
-      where: {
-        ...(year && { contentYear: year }),
-
-        ...(search && {
-          translations: {
-            some: {
-              displayName: {
-                contains: search,
-                mode: 'insensitive',
-              },
-              languageCode: lang,
-            },
-          },
-        }),
-      },
-
+  const select = {
+    id: true,
+    originalName: true,
+    fileType: true,
+    fileSize: true,
+    url: true,
+    contentYear: true,
+    createdAt: true,
+    translations: true,
+    contentType: {
       select: {
-        id: true,
-        originalName: true,
-        fileType: true,
-        fileSize: true,
-        url: true,
-        contentYear: true,
-        createdAt: true,
-
         translations: true,
+        category: { select: { translations: true } },
+        subcategory: { select: { translations: true } },
+      },
+    },
+  };
 
-        contentType: {
-          select: {
-            translations: true,
-            category: {
-              select: { translations: true },
+  const baseWhere: any = {
+    ...(year && { contentYear: year }),
+  };
+
+  let files = await this.prisma.fileAsset.findMany({
+    where: {
+      ...baseWhere,
+      ...(search && {
+        translations: {
+          some: {
+            displayName: {
+              contains: search,
+              mode: 'insensitive',
             },
-            subcategory: {
-              select: { translations: true },
+            languageCode: lang,
+          },
+        },
+      }),
+    },
+    select,
+    orderBy: isStringSort ? undefined : orderBy,
+    skip: isStringSort ? 0 : skip,
+    take: isStringSort ? 5000 : take,
+  });
+
+  if (search && files.length === 0) {
+    files = await this.prisma.fileAsset.findMany({
+      where: {
+        ...baseWhere,
+        translations: {
+          some: {
+            displayName: {
+              contains: search,
+              mode: 'insensitive',
             },
           },
         },
       },
-
-      orderBy,
-      skip,
-      take,
-    });
-
-
-    if (search && files.length === 0) {
-      files = await this.prisma.fileAsset.findMany({
-        where: {
-          ...(year && { contentYear: year }),
-
-          translations: {
-            some: {
-              displayName: {
-                contains: search,
-                mode: 'insensitive',
-              },
-            },
-          },
-        },
-
-        select: {
-          id: true,
-          originalName: true,
-          fileType: true,
-          fileSize: true,
-          url: true,
-          contentYear: true,
-          createdAt: true,
-
-          translations: true,
-
-          contentType: {
-            select: {
-              translations: true,
-              category: {
-                select: { translations: true },
-              },
-              subcategory: {
-                select: { translations: true },
-              },
-            },
-          },
-        },
-
-        orderBy,
-        skip,
-        take,
-      });
-    }
-
-
-    const pick = (arr: any[]) =>
-      arr.find((t) => t.languageCode === lang) ||
-      arr.find((t) => t.languageCode === 'en') ||
-      arr[0];
-
-    return files.map((file) => {
-      const fileTranslation = pick(file.translations);
-
-      const contentTypeTranslation = file.contentType?.translations?.length
-        ? pick(file.contentType.translations)
-        : null;
-
-      const categoryTranslation =
-        file.contentType?.category?.translations?.length
-          ? pick(file.contentType.category.translations)
-          : null;
-
-      const subcategoryTranslation =
-        file.contentType?.subcategory?.translations?.length
-          ? pick(file.contentType.subcategory.translations)
-          : null;
-
-      return {
-        id: file.id,
-        name: fileTranslation?.displayName || file.originalName,
-        originalName: file.originalName,
-        fileType: file.fileType,
-        fileSize: file.fileSize,
-        url: file.url,
-        year: file.contentYear,
-        createdAt: file.createdAt,
-        contentType: contentTypeTranslation?.name || null,
-        category: categoryTranslation?.name || null,
-        subcategory: subcategoryTranslation?.name || null,
-      };
+      select,
+      orderBy: isStringSort ? undefined : orderBy,
+      skip: isStringSort ? 0 : skip,
+      take: isStringSort ? 5000 : take,
     });
   }
+
+  const pick = (arr: any[]) =>
+    arr.find((t) => t.languageCode === lang) ||
+    arr.find((t) => t.languageCode === 'en') ||
+    arr[0];
+
+  const mappedFiles = files.map((file) => {
+    const fileTranslation = pick(file.translations);
+
+    const contentTypeTranslation = file.contentType?.translations?.length
+      ? pick(file.contentType.translations)
+      : null;
+
+    const categoryTranslation =
+      file.contentType?.category?.translations?.length
+        ? pick(file.contentType.category.translations)
+        : null;
+
+    const subcategoryTranslation =
+      file.contentType?.subcategory?.translations?.length
+        ? pick(file.contentType.subcategory.translations)
+        : null;
+
+    return {
+      id: file.id,
+      name: fileTranslation?.displayName || file.originalName,
+      originalName: file.originalName,
+      fileType: file.fileType,
+      fileSize: file.fileSize,
+      url: file.url,
+      year: file.contentYear,
+      createdAt: file.createdAt,
+      contentType: contentTypeTranslation?.name || null,
+      category: categoryTranslation?.name || null,
+      subcategory: subcategoryTranslation?.name || null,
+    };
+  });
+
+  const sortFn = (a: string, b: string) =>
+    a.localeCompare(b, undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    });
+
+  if (sortBy === 'originalName') {
+    mappedFiles.sort((a, b) =>
+      order === 'asc'
+        ? sortFn(a.originalName || '', b.originalName || '')
+        : sortFn(b.originalName || '', a.originalName || '')
+    );
+  }
+
+  if (sortBy === 'name') {
+    mappedFiles.sort((a, b) =>
+      order === 'asc'
+        ? sortFn(a.name || '', b.name || '')
+        : sortFn(b.name || '', a.name || '')
+    );
+  }
+
+  return isStringSort
+    ? mappedFiles.slice(skip, skip + take)
+    : mappedFiles;
+}
 }
