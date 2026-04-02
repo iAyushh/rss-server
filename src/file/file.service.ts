@@ -511,8 +511,9 @@ export class FileService {
   async getFileIndex(
     groupBy: 'year' | 'contentType' | 'category',
     lang: string,
+    skip = 0,
+    take = 20,
   ) {
-
     if (groupBy === 'year') {
       const result = await this.prisma.fileAsset.groupBy({
         by: ['contentYear'],
@@ -520,11 +521,16 @@ export class FileService {
         orderBy: { contentYear: 'desc' },
       });
 
+      const total = result.length;
+
+      const paginated = result.slice(skip, skip + take);
+
       return {
-        data: result.map((r) => ({
+        data: paginated.map((r) => ({
           year: r.contentYear,
           count: r._count.id,
         })),
+        total,
       };
     }
 
@@ -539,8 +545,12 @@ export class FileService {
         orderBy: { createdAt: 'desc' },
       });
 
+      const total = contentTypes.length;
+
+      const paginated = contentTypes.slice(skip, skip + take);
+
       return {
-        data: contentTypes.map((ct) => {
+        data: paginated.map((ct) => {
           const t =
             ct.translations.find((tr) => tr.languageCode === lang) ??
             ct.translations[0];
@@ -551,9 +561,9 @@ export class FileService {
             count: ct._count.files,
           };
         }),
+        total,
       };
     }
-
 
     if (groupBy === 'category') {
       const categories = await this.prisma.category.findMany({
@@ -569,8 +579,12 @@ export class FileService {
         },
       });
 
+      const total = categories.length;
+
+      const paginated = categories.slice(skip, skip + take);
+
       return {
-        data: categories.map((cat) => {
+        data: paginated.map((cat) => {
           const t =
             cat.translations.find((tr) => tr.languageCode === lang) ??
             cat.translations[0];
@@ -586,12 +600,12 @@ export class FileService {
             count: totalFiles,
           };
         }),
+        total,
       };
     }
 
-    return { data: [] };
+    return { data: [], total: 0 };
   }
-
   async update(fileId: number, dto: any) {
     const file = await this.prisma.fileAsset.findUnique({
       where: { id: fileId },
@@ -649,49 +663,49 @@ export class FileService {
 
 
 
-async deleteFile(id: number) {
-  const file = await this.prisma.fileAsset.findUnique({
-    where: { id },
-  });
-
-  if (!file) {
-    throw new NotFoundException('File not found');
-  }
-
-  
-  try {
-    if (file.storageKey?.includes('res.cloudinary.com')) {
-      
-      const publicId = this.extractPublicId(file.storageKey);
-      await cloudinary.uploader.destroy(publicId);
-    } else {
-      
-      const filePath = path.join(process.cwd(), 'uploads', file.storageKey);
-
-      await fs.unlink(filePath).catch(() => {
-        console.warn('Local file not found or already deleted');
-      });
-    }
-  } catch (err) {
-    console.warn('Storage deletion failed:', err.message);
-  }
-
- 
-  await this.prisma.$transaction([
-    this.prisma.fileMetadata.deleteMany({
-      where: { fileId: id },
-    }),
-    this.prisma.fileTranslation.deleteMany({
-      where: { fileId: id },
-    }),
-    this.prisma.fileAsset.delete({
+  async deleteFile(id: number) {
+    const file = await this.prisma.fileAsset.findUnique({
       where: { id },
-    }),
-  ]);
+    });
 
-  return {
-    success: true,
-    deletedId: id,
-  };
-}
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+
+    try {
+      if (file.storageKey?.includes('res.cloudinary.com')) {
+
+        const publicId = this.extractPublicId(file.storageKey);
+        await cloudinary.uploader.destroy(publicId);
+      } else {
+
+        const filePath = path.join(process.cwd(), 'uploads', file.storageKey);
+
+        await fs.unlink(filePath).catch(() => {
+          console.warn('Local file not found or already deleted');
+        });
+      }
+    } catch (err) {
+      console.warn('Storage deletion failed:', err.message);
+    }
+
+
+    await this.prisma.$transaction([
+      this.prisma.fileMetadata.deleteMany({
+        where: { fileId: id },
+      }),
+      this.prisma.fileTranslation.deleteMany({
+        where: { fileId: id },
+      }),
+      this.prisma.fileAsset.delete({
+        where: { id },
+      }),
+    ]);
+
+    return {
+      success: true,
+      deletedId: id,
+    };
+  }
 }

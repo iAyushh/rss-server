@@ -68,7 +68,6 @@ export class FileController {
   }
 
 
-
   @Get('index')
   @ApiQuery({
     name: 'groupBy',
@@ -76,18 +75,26 @@ export class FileController {
     enum: ['year', 'contentType', 'category'],
   })
   @ApiQuery({ name: 'lang', required: false, type: String })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
   async getFileIndex(
     @Query('groupBy') groupBy: 'year' | 'contentType' | 'category',
     @Query('lang') queryLang?: string,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
     @I18nLang() i18nLang?: string,
   ) {
     const lang = queryLang ?? i18nLang ?? 'hi';
 
-    return this.fileService.getFileIndex(groupBy, lang);
+    return this.fileService.getFileIndex(
+      groupBy,
+      lang,
+      Number(skip ?? 0),
+      Number(take ?? 20),
+    );
   }
 
 
- 
   @Get('content-types/:id')
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
@@ -111,7 +118,7 @@ export class FileController {
   }
 
 
- 
+
   @Get('category/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
@@ -155,7 +162,7 @@ export class FileController {
 
 
 
- 
+
   @Get('list/content-types')
   @ApiQuery({ name: 'lang', required: false, type: String })
   getAllContentTypes(
