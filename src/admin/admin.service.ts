@@ -6,7 +6,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Admin, AdminMeta, AdminStatus, Prisma } from '@prisma/client';
 import { adminConfigFactory } from '@Config';
 import {
-  StorageService,
   UtilsService,
   ValidatedUser,
   UserType,
@@ -22,14 +21,11 @@ export class AdminService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prisma: PrismaService,
     private readonly utilsService: UtilsService,
-    private readonly storageService: StorageService,
-  ) {}
+  
+  ) { }
 
   private getProfileImageUrl(profileImage: string): string {
-    return this.storageService.getFileUrl(
-      profileImage,
-      this.config.profileImagePath,
-    );
+   return profileImage;
   }
 
   private hashPassword(password: string): { salt: string; hash: string } {
@@ -171,19 +167,25 @@ export class AdminService {
       });
 
       // Remove previous profile image from storage
-      if (admin.profileImage) {
-        await this.storageService.removeFile(
-          join(this.config.profileImagePath, admin.profileImage),
-        );
-      }
-      await this.storageService.move(
-        profileImage,
-        this.config.profileImagePath,
-      );
+      // if (admin.profileImage) {
+      //   await this.storageService.removeFile(
+      //     join(this.config.profileImagePath, admin.profileImage),
+      //   );
+      // }
+      // await this.storageService.move(
+      //   profileImage,
+      //   this.config.profileImagePath,
+      // );
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.admin.update({
+          where: { id: adminId },
+          data: { profileImage },
+        });
 
-      return {
-        profileImage: this.getProfileImageUrl(profileImage),
-      };
+        return {
+          profileImage: profileImage, // already URL
+        };
+      });
     });
   }
 

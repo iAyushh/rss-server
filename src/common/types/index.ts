@@ -41,8 +41,8 @@ export class EnvironmentVariables {
   @IsString()
   REDIS_ENABLED?: string;
 
-  @IsString()
-  STORAGE_DIR: string;
+  // @IsString()
+  // STORAGE_DIR: string;
 }
 
 /**

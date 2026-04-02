@@ -9,10 +9,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiBody, ApiTags } from '@nestjs/swagger';
 import { StorageService, File, JwtAuthGuard, AccessGuard } from '@Common';
+import { storage } from './configs/cloudinary.storage';
 
 @Controller()
 export class AppController {
-  constructor(private readonly storageService: StorageService) {}
 
   @ApiTags('Storage')
   @ApiBearerAuth()
@@ -30,14 +30,14 @@ export class AppController {
     },
   })
   @UseGuards(JwtAuthGuard, AccessGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { storage }))
   @Post('upload')
   upload(
     @UploadedFile(new ParseFilePipeBuilder().build())
     file: File,
   ) {
     return {
-      url: this.storageService.getFileUrl(file.filename),
+      url: file.path,
 
       assetPayload: {
         fileName: file.originalname,

@@ -6,20 +6,16 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
-import { StorageService } from 'src/common/providers/storage.service';
+import { storage } from 'src/configs/cloudinary.storage';
 
 @Injectable()
 export class StorageFilesInterceptor implements NestInterceptor {
   private readonly filesInterceptor: NestInterceptor;
 
-  constructor(private readonly storageService: StorageService) {
-    const InterceptorClass = FilesInterceptor(
-      'files',
-      10,
-      this.storageService.defaultMulterOptions,
-    );
-    this.filesInterceptor = new InterceptorClass();
-  }
+  constructor() {
+  const InterceptorClass = FilesInterceptor('files', 10, { storage });
+  this.filesInterceptor = new InterceptorClass();
+}
 
   intercept(
     context: ExecutionContext,

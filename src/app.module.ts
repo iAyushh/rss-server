@@ -35,12 +35,12 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
       resolvers: [{ use: QueryResolver, options: ['lang'] }],
     }),
 
-    MulterModule.registerAsync({
-      useFactory: (storageService: StorageService) => ({
-        ...storageService.defaultMulterOptions,
-      }),
-      inject: [StorageService],
-    }),
+    // MulterModule.registerAsync({
+    //   useFactory: (storageService: StorageService) => ({
+    //     ...storageService.defaultMulterOptions,
+    //   }),
+    //   inject: [StorageService],
+    // }),
 
     CacheModule.register({
       isGlobal: true,
