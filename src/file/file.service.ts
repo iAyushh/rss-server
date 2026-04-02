@@ -241,8 +241,6 @@ export class FileService {
       }),
     ]);
 
-    // ✅ 🔥 ADD THIS BLOCK (category/subcategory mapping)
-
     const categoryIds = files
       .map((f) =>
         f.metadata.find((m) => m.key === 'categoryId')?.value

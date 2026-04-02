@@ -8,7 +8,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { I18nService } from 'nestjs-i18n';
 import { CategoryTranslation } from '@prisma/client';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
-import slugify from 'slugify';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { generateSlug } from '@Common';
 import { nanoid } from 'nanoid';
@@ -125,7 +124,6 @@ export class CategoryService {
 
     const cached = await this.cache.get(cacheKey);
     if (cached) {
-      console.log('== FROM CACHE ==');
       return cached;
     }
 
