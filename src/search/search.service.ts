@@ -2,6 +2,25 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma';
 
+type FileWithRelations = Prisma.FileAssetGetPayload<{
+    select: {
+      id: true;
+      originalName: true;
+      fileType: true;
+      fileSize: true;
+      url: true;
+      contentYear: true;
+      createdAt: true;
+      translations: true;
+      contentType: {
+        select: {
+          translations: true;
+          category: { select: { translations: true } };
+          subcategory: { select: { translations: true } };
+        };
+      };
+    };
+  }>;
 @Injectable()
 export class SearchService {
   constructor(private readonly prisma: PrismaService) { }
@@ -192,15 +211,17 @@ LIMIT ${take} OFFSET ${skip}
 
 
 
+
+
 async searchFiles(
-  search?: string,
-  languageCode?: string,
-  skip = 0,
-  take = 20,
-  year?: number,
-  sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name',
-  order?: 'asc' | 'desc',
-) {
+    search ?: string,
+    languageCode ?: string,
+    skip = 0,
+    take = 20,
+    year ?: number,
+    sortBy ?: 'updatedAt' | 'fileSize' | 'originalName' | 'name',
+    order ?: 'asc' | 'desc',
+  ) {
   const lang = languageCode || 'hi';
 
   const sortFieldMap = {
@@ -235,44 +256,49 @@ async searchFiles(
     },
   };
 
-  const baseWhere: any = {
+  const baseWhere: Prisma.FileAssetWhereInput = {
     ...(year && { contentYear: year }),
+    ...(search && {
+      translations: {
+        some: {
+          displayName: {
+            contains: search,
+            mode: Prisma.QueryMode.insensitive,
+          },
+          languageCode: lang,
+        },
+      },
+    }),
   };
 
-  let files = await this.prisma.fileAsset.findMany({
-    where: {
-      ...baseWhere,
-      ...(search && {
-        translations: {
-          some: {
-            displayName: {
-              contains: search,
-              mode: 'insensitive',
-            },
-            languageCode: lang,
-          },
-        },
-      }),
-    },
-    select,
-    orderBy: isStringSort ? undefined : orderBy,
-    skip: isStringSort ? 0 : skip,
-    take: isStringSort ? 5000 : take,
+  const total = await this.prisma.fileAsset.count({
+    where: baseWhere,
   });
 
+  let files: FileWithRelations[] =
+    await this.prisma.fileAsset.findMany({
+      where: baseWhere,
+      select,
+      orderBy: isStringSort ? undefined : orderBy,
+      skip: isStringSort ? 0 : skip,
+      take: isStringSort ? 5000 : take,
+    });
+
   if (search && files.length === 0) {
-    files = await this.prisma.fileAsset.findMany({
-      where: {
-        ...baseWhere,
-        translations: {
-          some: {
-            displayName: {
-              contains: search,
-              mode: 'insensitive',
-            },
+    const fallbackWhere: Prisma.FileAssetWhereInput = {
+      ...(year && { contentYear: year }),
+      translations: {
+        some: {
+          displayName: {
+            contains: search,
+            mode: Prisma.QueryMode.insensitive,
           },
         },
       },
+    };
+
+    files = await this.prisma.fileAsset.findMany({
+      where: fallbackWhere,
       select,
       orderBy: isStringSort ? undefined : orderBy,
       skip: isStringSort ? 0 : skip,
@@ -339,8 +365,13 @@ async searchFiles(
     );
   }
 
-  return isStringSort
+  const finalFiles = isStringSort
     ? mappedFiles.slice(skip, skip + take)
     : mappedFiles;
+
+  return {
+    files: finalFiles,
+    total,
+  };
 }
 }
