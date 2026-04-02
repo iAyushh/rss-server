@@ -2,9 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma';
 import { Prisma, FileType } from '@prisma/client';
 import { I18nService } from 'nestjs-i18n';
+import { FileTranslationDto } from './dto';
+import { v2 as cloudinary } from 'cloudinary';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { FileTranslationDto } from './dto';
 
 type FileWithRelations = Prisma.FileAssetGetPayload<{
   include: {
@@ -50,6 +51,19 @@ export class FileService {
     }
 
     return translation ?? null;
+  }
+
+
+  private extractPublicId(url: string): string {
+    try {
+      const parts = url.split('/upload/')[1];
+      const withoutVersion = parts.replace(/v\d+\//, '');
+      const publicId = withoutVersion.split('.').slice(0, -1).join('.');
+      return publicId;
+    } catch (err) {
+      console.warn('Failed to extract public_id from URL');
+      return '';
+    }
   }
 
   private formatFile(
@@ -633,36 +647,51 @@ export class FileService {
     };
   }
 
-  async deleteFile(id: number) {
-    const file = await this.prisma.fileAsset.findUnique({
-      where: { id },
-    });
 
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
 
-    await this.prisma.$transaction([
-      this.prisma.fileMetadata.deleteMany({
-        where: { fileId: id },
-      }),
-      this.prisma.fileTranslation.deleteMany({
-        where: { fileId: id },
-      }),
-      this.prisma.fileAsset.delete({
-        where: { id },
-      }),
-    ]);
+async deleteFile(id: number) {
+  const file = await this.prisma.fileAsset.findUnique({
+    where: { id },
+  });
 
-    await fs
-      .unlink(path.join(process.cwd(), 'uploads', file.storageKey))
-      .catch((err) => {
-        console.warn('File deletion failed:', err.message);
-      });
-
-    return {
-      success: true,
-      deletedId: id,
-    };
+  if (!file) {
+    throw new NotFoundException('File not found');
   }
+
+  
+  try {
+    if (file.storageKey?.includes('res.cloudinary.com')) {
+      
+      const publicId = this.extractPublicId(file.storageKey);
+      await cloudinary.uploader.destroy(publicId);
+    } else {
+      
+      const filePath = path.join(process.cwd(), 'uploads', file.storageKey);
+
+      await fs.unlink(filePath).catch(() => {
+        console.warn('Local file not found or already deleted');
+      });
+    }
+  } catch (err) {
+    console.warn('Storage deletion failed:', err.message);
+  }
+
+ 
+  await this.prisma.$transaction([
+    this.prisma.fileMetadata.deleteMany({
+      where: { fileId: id },
+    }),
+    this.prisma.fileTranslation.deleteMany({
+      where: { fileId: id },
+    }),
+    this.prisma.fileAsset.delete({
+      where: { id },
+    }),
+  ]);
+
+  return {
+    success: true,
+    deletedId: id,
+  };
+}
 }

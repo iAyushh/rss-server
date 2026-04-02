@@ -30,7 +30,11 @@ export class AppController {
     },
   })
   @UseGuards(JwtAuthGuard, AccessGuard)
-  @UseInterceptors(FileInterceptor('file', { storage }))
+  @UseInterceptors(FileInterceptor('file', {
+    storage, limits: {
+      fileSize: 100 * 1024 * 1024, // 100MB
+    },
+  }))
   @Post('upload')
   upload(
     @UploadedFile(new ParseFilePipeBuilder().build())

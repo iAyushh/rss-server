@@ -1,4 +1,3 @@
-import { isAxiosError } from 'axios';
 import {
   ExceptionFilter,
   Catch,
@@ -13,32 +12,33 @@ export class AllExceptionsFilter implements ExceptionFilter {
   constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const hostType = host.getType();
-    if (hostType === 'http') {
-      // In certain situations `httpAdapter` might not be available in the
-      // constructor method, thus we should resolve it here.
-      const { httpAdapter } = this.httpAdapterHost;
+    if (host.getType() !== 'http') return;
 
-      const ctx = host.switchToHttp();
+    const { httpAdapter } = this.httpAdapterHost;
+    const ctx = host.switchToHttp();
 
-      const httpStatus =
-        exception instanceof HttpException
-          ? exception.getStatus()
-          : HttpStatus.INTERNAL_SERVER_ERROR;
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message = 'Internal server error';
 
-      // TODO: Create DTO to transmit the error response to the client
-      const responseBody =
-        exception instanceof HttpException
-          ? exception.getResponse()
-          : {
-              status: httpStatus,
-              message:
-                exception instanceof Error && !isAxiosError(exception)
-                  ? exception.message
-                  : 'Internal server error',
-            };
-
-      httpAdapter.reply(ctx.getResponse(), responseBody, httpStatus);
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      const res = exception.getResponse();
+      message =
+        typeof res === 'string'
+          ? res
+          : (res as any)?.message || exception.message;
+    } else if (exception instanceof Error) {
+      status = HttpStatus.BAD_REQUEST;
+      message = exception.message;
     }
+
+    httpAdapter.reply(
+      ctx.getResponse(),
+      {
+        statusCode: status,
+        message,
+      },
+      status,
+    );
   }
 }

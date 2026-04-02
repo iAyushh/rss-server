@@ -8,7 +8,6 @@ import {
   Patch,
   UseGuards,
   Query,
-  UseInterceptors,
 } from '@nestjs/common';
 import { CategoryService } from './categories.service';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
