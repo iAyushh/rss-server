@@ -8,7 +8,6 @@ import {
   Patch,
   UseGuards,
   Query,
-  UseInterceptors,
 } from '@nestjs/common';
 import { I18nLang } from 'nestjs-i18n';
 import { SubcategoriesService } from './subcategories.service';

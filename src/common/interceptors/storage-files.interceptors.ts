@@ -3,24 +3,47 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  BadRequestException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
 import { storage } from 'src/configs/cloudinary.storage';
+import { MulterError } from 'multer';
 
 @Injectable()
 export class StorageFilesInterceptor implements NestInterceptor {
   private readonly filesInterceptor: NestInterceptor;
 
   constructor() {
-  const InterceptorClass = FilesInterceptor('files', 10, { storage });
-  this.filesInterceptor = new InterceptorClass();
-}
+    const InterceptorClass = FilesInterceptor('files', 10, {
+      storage,
 
-  intercept(
+      
+      limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB
+      },
+    });
+
+    this.filesInterceptor = new InterceptorClass();
+  }
+
+  async intercept(
     context: ExecutionContext,
     next: CallHandler,
-  ): Observable<any> | Promise<Observable<any>> {
-    return this.filesInterceptor.intercept(context, next);
+  ): Promise<Observable<any>> {
+    try {
+      return await this.filesInterceptor.intercept(context, next);
+    } catch (error) {
+      
+      if (error instanceof MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          throw new BadRequestException(
+            'File too large. Max allowed size is 100MB',
+          );
+        }
+      }
+
+      throw error;
+    }
   }
 }

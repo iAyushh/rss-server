@@ -11,7 +11,6 @@ import {
   CreateSubcategoryRequestDto,
   UpdateSubcategoryRequestDto,
 } from './dto';
-import slugify from 'slugify';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { nanoid } from 'nanoid';
 import { generateSlug } from '@Common';

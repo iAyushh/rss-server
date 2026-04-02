@@ -15,16 +15,18 @@ export class IngestionService {
     private readonly i18n: I18nService,
   ) { }
 
+private validateFiles(
+  files: Express.Multer.File[],
+  type: FileType | undefined,
+  lang: string,
+) {
+  if (!type) {
+    console.log('No file type provided, skipping validation');
+    return;
+  }
 
-  private validateFiles(files: Express.Multer.File[], type: FileType | undefined, lang: string) {
-
-    if (!type) {
-      console.log('No file type provided, skipping validation');
-      return;
-    }
-    const allowedMimes = FILE_TYPE_MIME_MAP[type];
-    if (!allowedMimes.length) return;
-
+  const allowedMimes = FILE_TYPE_MIME_MAP[type];
+  if (allowedMimes?.length) {
     for (const file of files) {
       if (!allowedMimes.includes(file.mimetype)) {
         throw new BadRequestException(
@@ -34,10 +36,25 @@ export class IngestionService {
     }
   }
 
+  
+  const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+
+  for (const file of files) {
+    if (file.size > MAX_SIZE) {
+      throw new BadRequestException(
+        this.i18n.t('common.errors.FILE_TOO_LARGE', {
+          lang,
+          args: { max: '100MB' },
+        }) || 'File too large. Max allowed size is 100MB',
+      );
+    }
+  }
+}
+
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
     let metadata: Record<string, any> = {};
 
-  
+
     if (dto.metadata) {
       try {
         metadata = JSON.parse(dto.metadata);
@@ -60,29 +77,28 @@ export class IngestionService {
 
     this.validateFiles(files, dto.type, dto.lang ?? 'hi');
 
-  const normalizedFiles = files.map((file) => ({
-  originalName: file.originalname,
-  storageKey: file.path, 
-  url: file.path,       
-  mimeType: file.mimetype,
-  extension: path.extname(file.originalname),
-  fileSize: file.size,
-  fileType: dto.type,
-  displayName: dto.displayName || file.originalname,
-  description: dto.description ?? null,
-}));
+    const normalizedFiles = files.map((file) => ({
+      originalName: file.originalname,
+      storageKey: file.path,
+      url: file.path,
+      mimeType: file.mimetype,
+      extension: path.extname(file.originalname),
+      fileSize: file.size,
+      fileType: dto.type,
+      displayName: dto.displayName || file.originalname,
+      description: dto.description ?? null,
+    }));
 
     const assets = await this.prisma.$transaction(async (tx) => {
+
       const lang = dto.lang ?? 'hi';
-      const baseUrl = process.env.APP_URL + '/uploads';
 
       const createdAssets = [];
 
       for (const file of normalizedFiles) {
-        const fileUrl = `${baseUrl}/${file.storageKey}`;
+
         const finalType = dto.type ?? FileType.OTHER;
 
-        
         const asset = await tx.fileAsset.create({
           data: {
             contentTypeId: dto.contentTypeId,
@@ -97,7 +113,7 @@ export class IngestionService {
           },
         });
 
-        
+
         await tx.fileTranslation.create({
           data: {
             fileId: asset.id,
@@ -107,10 +123,10 @@ export class IngestionService {
           },
         });
 
-        
+
         const metadataRows: { key: string; value: string }[] = [];
 
-        
+
         if (dto.categoryId) {
           metadataRows.push({
             key: 'categoryId',
@@ -125,12 +141,12 @@ export class IngestionService {
           });
         }
 
-        
+
         for (const [key, value] of Object.entries(metadata)) {
           if (
             value !== undefined &&
             value !== null &&
-            !['category', 'subcategory'].includes(key) 
+            !['category', 'subcategory'].includes(key)
           ) {
             metadataRows.push({
               key,
@@ -139,7 +155,7 @@ export class IngestionService {
           }
         }
 
-        
+
         if (metadataRows.length > 0) {
           await tx.fileMetadata.createMany({
             data: metadataRows.map((m) => ({
@@ -156,7 +172,7 @@ export class IngestionService {
       return createdAssets;
     });
 
-    
+
     const ids = assets.map((a) => a.id);
 
     if (ids.length > 0) {
@@ -185,7 +201,7 @@ export class IngestionService {
         fileType: file.fileType,
         fileSize: file.fileSize,
         year: file.contentYear,
-        url: this.fileService.getPublicUrl(file.storageKey),
+        url: file.url,
         uploadedAt: file.uploadedAt,
       })),
     };
