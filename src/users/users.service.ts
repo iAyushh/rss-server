@@ -34,15 +34,12 @@ export class UsersService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prisma: PrismaService,
     private readonly utilsService: UtilsService,
-    private readonly storageService: StorageService,
     private readonly otpService: OtpService,
-  ) {}
+  ) { }
 
   private getProfileImageUrl(profileImage: string): string {
-    return this.storageService.getFileUrl(
-      profileImage,
-      this.config.profileImagePath,
-    );
+    return profileImage;
+
   }
 
   private hashPassword(password: string): { salt: string; hash: string } {
@@ -379,19 +376,8 @@ export class UsersService {
         data: { profileImage },
       });
 
-      if (user.profileImage) {
-        // Remove previous profile image from storage
-        await this.storageService.removeFile(
-          join(this.config.profileImagePath, user.profileImage),
-        );
-      }
-      await this.storageService.move(
-        profileImage,
-        this.config.profileImagePath,
-      );
-
       return {
-        profileImage: this.getProfileImageUrl(profileImage),
+        profileImage: profileImage,
       };
     });
   }

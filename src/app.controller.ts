@@ -13,7 +13,6 @@ import { storage } from './configs/cloudinary.storage';
 
 @Controller()
 export class AppController {
-  constructor(private readonly storageService: StorageService) {}
 
   @ApiTags('Storage')
   @ApiBearerAuth()
@@ -38,13 +37,13 @@ export class AppController {
     file: File,
   ) {
     return {
-      url: this.storageService.getFileUrl(file.filename),
+      url: file.path,
 
       assetPayload: {
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
-        storageKey: file.path,
+        storageKey: file.filename,
       },
 
       meta: {
