@@ -7,7 +7,8 @@ import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
 import { I18nService } from 'nestjs-i18n';
 import cloudinary from 'src/configs/cloudinary.config';
-import { Readable } from 'node:stream';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { s3 } from 'src/configs/amazonS3.config';
 
 @Injectable()
 export class IngestionService {
@@ -15,55 +16,51 @@ export class IngestionService {
     private readonly prisma: PrismaService,
     private readonly fileService: FileService,
     private readonly i18n: I18nService,
-  ) { }
-
+  ) {}
 
   private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const isPdf = file.mimetype === 'application/pdf';
+    return new Promise((resolve, reject) => {
+      const originalName = file.originalname;
+      const baseName = originalName.replace(/\.[^/.]+$/, '');
 
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'rss-uploads',
-
-       
-        resource_type: isPdf ? 'raw' : 'auto',
-        type: 'upload', 
-
-      },
-      (error, result) => {
-        if (error) {
-          if ((error as any)?.http_code === 413) {
-            return reject(
-              new BadRequestException(
-                'File too large. Max allowed size is 100MB',
-              ),
-            );
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'rss-uploads',
+          resource_type: 'raw',
+          public_id: baseName,
+          overwrite: true,
+          access_mode: 'public',
+        },
+        (error, result) => {
+          if (error) {
+            return reject(error);
           }
 
-          return reject(
-            new BadRequestException(
-              (error as any)?.message || 'Cloudinary upload failed',
-            ),
-          );
-        }
+          resolve(result?.secure_url || '');
+        },
+      );
 
-        if (!result?.secure_url) {
-          return reject(
-            new BadRequestException('Cloudinary upload failed'),
-          );
-        }
+      stream.end(file.buffer);
+    });
+  }
 
-        resolve(result.secure_url);
-      },
-    );
+  async uploadToS3(file: Express.Multer.File): Promise<string> {
+    const fileName = `${Date.now()}-${file.originalname}`;
 
-    const bufferStream = new Readable();
-    bufferStream.push(file.buffer);
-    bufferStream.push(null);
-    bufferStream.pipe(stream);
-  });
-}
+    const command = new PutObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME!,
+      Key: `rss-uploads/${fileName}`,
+      Body: file.buffer,
+
+      ContentType: file.mimetype,
+
+      ContentDisposition: 'inline',
+    });
+
+    await s3.send(command);
+
+    return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/rss-uploads/${fileName}`;
+  }
 
   private validateFiles(
     files: Express.Multer.File[],
@@ -86,7 +83,6 @@ export class IngestionService {
       }
     }
 
-
     const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 
     for (const file of files) {
@@ -103,7 +99,6 @@ export class IngestionService {
 
   async ingest(dto: IngestionDto, files: Express.Multer.File[]) {
     let metadata: Record<string, any> = {};
-
 
     if (dto.metadata) {
       try {
@@ -140,13 +135,7 @@ export class IngestionService {
     }[] = [];
 
     for (const file of files) {
-      const uploadedUrl = await this.uploadToCloudinary(file);
-
-      const isPdf = file.mimetype === 'application/pdf';
-
-      const url = isPdf
-        ? uploadedUrl.replace('/image/upload/', '/raw/upload/')
-        : uploadedUrl;
+      const url = await this.uploadToS3(file);
 
       normalizedFiles.push({
         originalName: file.originalname,
@@ -162,13 +151,11 @@ export class IngestionService {
     }
 
     const assets = await this.prisma.$transaction(async (tx) => {
-
       const lang = dto.lang ?? 'hi';
 
       const createdAssets = [];
 
       for (const file of normalizedFiles) {
-
         const finalType = dto.type ?? FileType.OTHER;
 
         const asset = await tx.fileAsset.create({
@@ -185,7 +172,6 @@ export class IngestionService {
           },
         });
 
-
         await tx.fileTranslation.create({
           data: {
             fileId: asset.id,
@@ -195,9 +181,7 @@ export class IngestionService {
           },
         });
 
-
         const metadataRows: { key: string; value: string }[] = [];
-
 
         if (dto.categoryId) {
           metadataRows.push({
@@ -213,7 +197,6 @@ export class IngestionService {
           });
         }
 
-
         for (const [key, value] of Object.entries(metadata)) {
           if (
             value !== undefined &&
@@ -226,7 +209,6 @@ export class IngestionService {
             });
           }
         }
-
 
         if (metadataRows.length > 0) {
           await tx.fileMetadata.createMany({
@@ -243,7 +225,6 @@ export class IngestionService {
 
       return createdAssets;
     });
-
 
     const ids = assets.map((a) => a.id);
 
