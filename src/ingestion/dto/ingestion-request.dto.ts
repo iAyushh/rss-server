@@ -14,7 +14,7 @@ export class IngestionDto {
 
   @ApiPropertyOptional({ enum: FileType })
   @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value)) 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsEnum(FileType)
   type?: FileType;
 

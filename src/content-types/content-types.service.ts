@@ -17,7 +17,7 @@ export class ContentTypeService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) { }
+  ) {}
 
   private async invalidateCache() {
     await this.cache.del('content-types:hi');
@@ -25,7 +25,6 @@ export class ContentTypeService {
   }
 
   async create(dto: CreateContentTypeDto) {
-
     const category = await this.prisma.category.findUnique({
       where: { id: dto.categoryId },
     });
@@ -33,7 +32,6 @@ export class ContentTypeService {
     if (!category) {
       throw new BadRequestException('Invalid categoryId');
     }
-
 
     if (dto.subcategoryId) {
       const sub = await this.prisma.subcategory.findUnique({
@@ -47,11 +45,8 @@ export class ContentTypeService {
       }
     }
 
-
     const content = await this.prisma.$transaction(async (tx) => {
-      const english = dto.translations?.find(
-        (t) => t.languageCode === 'en',
-      );
+      const english = dto.translations?.find((t) => t.languageCode === 'en');
 
       const slugSource = english?.name?.trim();
 
@@ -84,11 +79,11 @@ export class ContentTypeService {
 
           metadata: dto.metadata
             ? {
-              create: dto.metadata.map((m) => ({
-                key: m.key,
-                value: m.value,
-              })),
-            }
+                create: dto.metadata.map((m) => ({
+                  key: m.key,
+                  value: m.value,
+                })),
+              }
             : undefined,
         },
 
@@ -300,7 +295,7 @@ WHERE ct.id = ${content.id};
 
         if (
           !result[year].categories[category.slug].subcategories[
-          subcategory.slug
+            subcategory.slug
           ]
         ) {
           result[year].categories[category.slug].subcategories[
@@ -336,7 +331,6 @@ WHERE ct.id = ${content.id};
     }));
   }
 
-
   async update(id: number, dto: UpdateContentTypeDto, lang: string) {
     const exists = await this.prisma.contentType.findUnique({
       where: { id },
@@ -349,7 +343,6 @@ WHERE ct.id = ${content.id};
     }
 
     await this.prisma.$transaction(async (tx) => {
-
       await tx.contentType.update({
         where: { id },
         data: {
@@ -383,9 +376,7 @@ WHERE ct.id = ${content.id};
       }
     });
 
-    const newEnglish = dto.translations?.find(
-      (t) => t.languageCode === 'en',
-    );
+    const newEnglish = dto.translations?.find((t) => t.languageCode === 'en');
 
     if (newEnglish?.name?.trim()) {
       const newSlugBase = generateSlug(newEnglish.name);
@@ -435,7 +426,6 @@ WHERE ct.id = ${id};
       message: this.i18n.t('common.success.CONTENT_UPDATED', { lang }),
     };
   }
-
 
   async remove(id: number) {
     const content = await this.prisma.contentType.findUnique({

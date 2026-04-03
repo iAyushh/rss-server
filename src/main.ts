@@ -43,7 +43,6 @@ async function bootstrap() {
   app.use(express.urlencoded({ limit: '200mb', extended: true }));
   app.use(compression({ level: 1 }));
 
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -56,20 +55,20 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter(app.get(HttpAdapterHost)));
   const origins = appConfig.domain
     ? [
-      new RegExp(
-        `^http[s]{0,1}://(?:${appConfig.domain}|[a-z0-9-]+.${appConfig.domain})$`,
-      ),
-    ]
+        new RegExp(
+          `^http[s]{0,1}://(?:${appConfig.domain}|[a-z0-9-]+.${appConfig.domain})$`,
+        ),
+      ]
     : [];
 
   app.enableCors({
     origin: utilsService.isProductionApp()
       ? origins
       : [
-        'https://rss-react-nine.vercel.app',
-        'http://localhost:5173',
-        'http://localhost:3000',
-      ],
+          'https://rss-react-nine.vercel.app',
+          'http://localhost:5173',
+          'http://localhost:3000',
+        ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -86,7 +85,7 @@ async function bootstrap() {
   //   { prefix: `/${configService.get('STORAGE_DIR')}` },
   // );
   app.useStaticAssets(path.join(process.cwd(), 'static'));
-  ``
+  ``;
   const config = new DocumentBuilder()
     .setTitle(appConfig.platformName || '')
     .addServer(appConfig.serverUrl || '')
@@ -94,8 +93,9 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-spec', app, document, {
-    customSiteTitle: `${appConfig.platformName || ''
-      } OpenAPI Specification`.trim(),
+    customSiteTitle: `${
+      appConfig.platformName || ''
+    } OpenAPI Specification`.trim(),
     swaggerOptions: {
       persistAuthorization: true,
     },

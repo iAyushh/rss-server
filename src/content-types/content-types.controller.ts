@@ -22,7 +22,6 @@ import {
 } from '@Common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 
-
 @ApiBearerAuth()
 @ApiTags('Content-Types')
 @UseGuards(JwtAuthGuard, AccessGuard)
@@ -35,7 +34,6 @@ export class ContentTypeController {
     return this.contentTypeService.create(dto);
   }
 
-  
   @Get()
   @ApiQuery({ name: 'categoryId', required: false, type: Number })
   @ApiQuery({ name: 'subcategoryId', required: false, type: Number })

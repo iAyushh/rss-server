@@ -21,7 +21,7 @@ export class SubcategoriesService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) { }
+  ) {}
 
   private async invalidateCache(categoryId: number) {
     await this.cache.del(`subcategories:${categoryId}:hi`);
@@ -43,7 +43,6 @@ export class SubcategoriesService {
     const slugSource = english?.name?.trim();
 
     let slug: string;
-
 
     if (slugSource) {
       slug = generateSlug(slugSource);
@@ -73,11 +72,7 @@ export class SubcategoriesService {
           );
         }
       }
-
-    }
-
-
-    else {
+    } else {
       slug = `subcategory-${nanoid(5)}`;
     }
 
@@ -196,37 +191,35 @@ WHERE s.id = ${subcategory.id};
         );
       });
     }
-    const newEnglish = dto.translations?.find(
-  (t) => t.languageCode === 'en',
-);
+    const newEnglish = dto.translations?.find((t) => t.languageCode === 'en');
 
-if (newEnglish?.name?.trim()) {
-  const newSlugBase = generateSlug(newEnglish.name);
+    if (newEnglish?.name?.trim()) {
+      const newSlugBase = generateSlug(newEnglish.name);
 
-  if (newSlugBase) {
-    let slug = newSlugBase;
-    let counter = 0;
+      if (newSlugBase) {
+        let slug = newSlugBase;
+        let counter = 0;
 
-    while (true) {
-      const exists = await this.prisma.subcategory.findFirst({
-        where: {
-          slug,
-          NOT: { id }, 
-        },
-      });
+        while (true) {
+          const exists = await this.prisma.subcategory.findFirst({
+            where: {
+              slug,
+              NOT: { id },
+            },
+          });
 
-      if (!exists) break;
+          if (!exists) break;
 
-      counter++;
-      slug = `${newSlugBase}-${counter}`; 
+          counter++;
+          slug = `${newSlugBase}-${counter}`;
+        }
+
+        await this.prisma.subcategory.update({
+          where: { id },
+          data: { slug },
+        });
+      }
     }
-
-    await this.prisma.subcategory.update({
-      where: { id },
-      data: { slug },
-    });
-  }
-}
     await this.prisma.$executeRaw`
 UPDATE subcategory s
 SET search_vector =
@@ -248,7 +241,6 @@ WHERE s.id = ${id};
       message: this.i18n.t('common.success.SUBCATEGORY_UPDATED', { lang }),
     };
   }
-
 
   async remove(id: number, lang: string) {
     const subcategory = await this.prisma.subcategory.findUnique({

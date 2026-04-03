@@ -16,7 +16,7 @@ export class StorageFilesInterceptor implements NestInterceptor {
 
   constructor() {
     const InterceptorClass = FilesInterceptor('files', 10, {
-      storage: multer.memoryStorage(), 
+      storage: multer.memoryStorage(),
 
       limits: {
         fileSize: 100 * 1024 * 1024, // 100MB

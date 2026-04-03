@@ -10,7 +10,7 @@ export const appConfigFactory = registerAs('app', () => ({
   serverUrl: process.env.SERVER_URL,
   appUri: process.env.APP_URI,
   httpPayloadMaxSize: '20mb',
-  cacheTtl: Number(process.env.CACHE_TTL)* 1000 || 600000,
+  cacheTtl: Number(process.env.CACHE_TTL) * 1000 || 600000,
   redisEnabled: process.env.REDIS_ENABLED === 'true',
   redisUrl: process.env.REDIS_URI,
   platformName: process.env.PLATFORM_NAME,

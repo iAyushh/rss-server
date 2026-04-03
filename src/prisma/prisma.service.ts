@@ -10,7 +10,8 @@ let prisma: PrismaClient;
 @Injectable()
 export class PrismaService
   extends PrismaClient
-  implements OnModuleInit, OnApplicationShutdown {
+  implements OnModuleInit, OnApplicationShutdown
+{
   constructor() {
     if (!prisma) {
       prisma = new PrismaClient({
@@ -19,7 +20,7 @@ export class PrismaService
     }
 
     super();
-    Object.assign(this, prisma); 
+    Object.assign(this, prisma);
   }
 
   async onModuleInit() {

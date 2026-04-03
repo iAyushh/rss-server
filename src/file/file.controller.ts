@@ -23,15 +23,13 @@ import {
 import { I18nLang } from 'nestjs-i18n';
 import { UpdateFileRequestDto } from './dto';
 
-
 @ApiBearerAuth()
 @ApiTags('Files')
 @Roles(UserType.Admin)
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) { }
-
+  constructor(private readonly fileService: FileService) {}
 
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
@@ -67,7 +65,6 @@ export class FileController {
     });
   }
 
-
   @Get('index')
   @ApiQuery({
     name: 'groupBy',
@@ -94,7 +91,6 @@ export class FileController {
     );
   }
 
-
   @Get('content-types/:id')
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
@@ -117,8 +113,6 @@ export class FileController {
     });
   }
 
-
-
   @Get('category/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
@@ -139,7 +133,6 @@ export class FileController {
     });
   }
 
-
   @Get('subcategory/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
@@ -159,9 +152,6 @@ export class FileController {
       lang,
     });
   }
-
-
-
 
   @Get('list/content-types')
   @ApiQuery({ name: 'lang', required: false, type: String })
