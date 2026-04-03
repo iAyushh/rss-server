@@ -24,7 +24,7 @@ export class CategoryService {
     const currentVersion =
       (await this.cache.get<number>('categories:version')) ?? 1;
 
-    await this.cache.set('categories:version', currentVersion + 1);
+    await this.cache.set('categories:version', currentVersion + 1, 0);
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
@@ -118,7 +118,7 @@ export class CategoryService {
 
   async findAll(lang: string, skip = 0, take = 20) {
     const version =
-      (await this.cache.get<number>('categories:version')) ?? 1;
+      (await this.cache.get<number>('categories:version')) || 1;
 
     const cacheKey = `categories:${version}:${lang}:${skip}:${take}`;
 
@@ -130,7 +130,8 @@ export class CategoryService {
     const [categories, total] = await Promise.all([
       this.prisma.category.findMany({
         include: { translations: true },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ createdAt: 'asc' },
+        { id: 'asc' }],
         skip,
         take,
       }),
@@ -163,7 +164,7 @@ export class CategoryService {
 
     const result = { data, total };
 
-    await this.cache.set(cacheKey, result, 600 * 1000);
+    await this.cache.set(cacheKey, result, 600);
 
     return result;
   }

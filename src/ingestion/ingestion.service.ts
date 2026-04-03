@@ -7,7 +7,6 @@ import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
 import { I18nService } from 'nestjs-i18n';
 import cloudinary from 'src/configs/cloudinary.config';
-import streamifier from 'streamifier';
 import { Readable } from 'node:stream';
 
 @Injectable()
@@ -20,35 +19,51 @@ export class IngestionService {
 
 
   private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'rss-uploads',
-          resource_type: 'auto',
-        },
-        (error, result) => {
-          if (error) {
-            if ((error as any)?.http_code === 413) {
-              return reject(
-                new BadRequestException(
-                  'File too large. Max allowed size is 100MB',
-                ),
-              );
-            }
+  return new Promise((resolve, reject) => {
+    const isPdf = file.mimetype === 'application/pdf';
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'rss-uploads',
+
+       
+        resource_type: isPdf ? 'raw' : 'auto',
+        type: 'upload', 
+
+      },
+      (error, result) => {
+        if (error) {
+          if ((error as any)?.http_code === 413) {
             return reject(
-              new BadRequestException('Cloudinary upload failed'),
+              new BadRequestException(
+                'File too large. Max allowed size is 100MB',
+              ),
             );
           }
-          resolve(result?.secure_url || '');
-        },
-      );
 
-      const bufferStream = new Readable();
-      bufferStream.push(file.buffer);
-      bufferStream.push(null);
-      bufferStream.pipe(stream);
-    });
-  }
+          return reject(
+            new BadRequestException(
+              (error as any)?.message || 'Cloudinary upload failed',
+            ),
+          );
+        }
+
+        if (!result?.secure_url) {
+          return reject(
+            new BadRequestException('Cloudinary upload failed'),
+          );
+        }
+
+        resolve(result.secure_url);
+      },
+    );
+
+    const bufferStream = new Readable();
+    bufferStream.push(file.buffer);
+    bufferStream.push(null);
+    bufferStream.pipe(stream);
+  });
+}
 
   private validateFiles(
     files: Express.Multer.File[],
@@ -125,7 +140,13 @@ export class IngestionService {
     }[] = [];
 
     for (const file of files) {
-      const url = await this.uploadToCloudinary(file);
+      const uploadedUrl = await this.uploadToCloudinary(file);
+
+      const isPdf = file.mimetype === 'application/pdf';
+
+      const url = isPdf
+        ? uploadedUrl.replace('/image/upload/', '/raw/upload/')
+        : uploadedUrl;
 
       normalizedFiles.push({
         originalName: file.originalname,
