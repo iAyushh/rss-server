@@ -116,8 +116,7 @@ WHERE s.id = ${subcategory.id};
     const cached = await this.cache.get<{ result: any[]; total: number }>(cacheKey);
     if (cached) return cached;
 
-    const languages = lang === 'hi' ? ['hi'] : [lang, 'hi'];
-
+    const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
     const [subcategories, total] = await Promise.all([
       this.prisma.subcategory.findMany({
         where: { categoryId },
@@ -143,19 +142,11 @@ WHERE s.id = ${subcategory.id};
     ]);
 
     const result = subcategories.map((sub) => {
-      let translation = sub.translations.find(
-        (t: SubcategoryTranslation) => t.languageCode === lang,
-      );
-
-      if (!translation) {
-        translation = sub.translations.find(
-          (t: SubcategoryTranslation) => t.languageCode === 'hi',
-        );
-      }
-
-      if (!translation && sub.translations.length > 0) {
-        translation = sub.translations[0];
-      }
+      let translation =
+        sub.translations.find((t) => t.languageCode === lang) ??
+        sub.translations.find((t) => t.languageCode === 'hi') ??
+        sub.translations.find((t) => t.languageCode === 'en') ??
+        sub.translations[0];
 
       return {
         id: sub.id,
