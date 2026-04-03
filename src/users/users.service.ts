@@ -35,11 +35,10 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly utilsService: UtilsService,
     private readonly otpService: OtpService,
-  ) { }
+  ) {}
 
   private getProfileImageUrl(profileImage: string): string {
     return profileImage;
-
   }
 
   private hashPassword(password: string): { salt: string; hash: string } {

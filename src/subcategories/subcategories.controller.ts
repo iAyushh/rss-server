@@ -25,15 +25,13 @@ import { UserType } from '@Common';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('subcategories')
 export class SubcategoriesController {
-  constructor(private readonly subcategoriesService: SubcategoriesService) { }
+  constructor(private readonly subcategoriesService: SubcategoriesService) {}
 
   @Post()
   create(@Body() dto: CreateSubcategoryRequestDto, @I18nLang() lang: string) {
     return this.subcategoriesService.create(dto, lang);
   }
 
-
- 
   @Get('category/:categoryId')
   findByCategory(
     @Param('categoryId') categoryId: string,

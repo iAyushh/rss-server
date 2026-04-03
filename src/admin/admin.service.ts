@@ -21,11 +21,10 @@ export class AdminService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prisma: PrismaService,
     private readonly utilsService: UtilsService,
-  
-  ) { }
+  ) {}
 
   private getProfileImageUrl(profileImage: string): string {
-   return profileImage;
+    return profileImage;
   }
 
   private hashPassword(password: string): { salt: string; hash: string } {

@@ -5,7 +5,7 @@ import { validateEnvironmentVariables } from './utils';
 import { UtilsService } from './providers';
 import { JwtStrategy } from './strategies';
 
-const providers = [ UtilsService, JwtStrategy];
+const providers = [UtilsService, JwtStrategy];
 
 @Global()
 @Module({

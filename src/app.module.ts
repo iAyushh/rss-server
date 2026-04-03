@@ -44,10 +44,10 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
 
     CacheModule.register({
       isGlobal: true,
-     stores: process.env.REDIS_URI
-    ? [new KeyvRedis(process.env.REDIS_URI)]
-    : undefined,
-      ttl: 600*1000,
+      stores: process.env.REDIS_URI
+        ? [new KeyvRedis(process.env.REDIS_URI)]
+        : undefined,
+      ttl: 600 * 1000,
     }),
 
     EventEmitterModule.forRoot(),
@@ -73,4 +73,4 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
   //   },
   // ],
 })
-export class AppModule { }
+export class AppModule {}

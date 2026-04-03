@@ -13,7 +13,6 @@ import { storage } from './configs/cloudinary.storage';
 
 @Controller()
 export class AppController {
-
   @ApiTags('Storage')
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
@@ -30,11 +29,14 @@ export class AppController {
     },
   })
   @UseGuards(JwtAuthGuard, AccessGuard)
-  @UseInterceptors(FileInterceptor('file', {
-    storage, limits: {
-      fileSize: 100 * 1024 * 1024, // 100MB
-    },
-  }))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage,
+      limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB
+      },
+    }),
+  )
   @Post('upload')
   upload(
     @UploadedFile(new ParseFilePipeBuilder().build())

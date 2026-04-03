@@ -6,6 +6,8 @@ import { FileTranslationDto } from './dto';
 import { v2 as cloudinary } from 'cloudinary';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { s3 } from 'src/configs/amazonS3.config';
 
 type FileWithRelations = Prisma.FileAssetGetPayload<{
   include: {
@@ -31,7 +33,7 @@ export class FileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
-  ) { }
+  ) {}
 
   getPublicUrl(storageKey: string) {
     return storageKey;
@@ -52,7 +54,6 @@ export class FileService {
 
     return translation ?? null;
   }
-
 
   private extractPublicId(url: string): string {
     try {
@@ -83,15 +84,12 @@ export class FileService {
         {} as Record<string, string>,
       ) ?? {};
 
-
-
     if (metadata.categoryId && categoryMap) {
       const categoryName = categoryMap.get(Number(metadata.categoryId));
       if (categoryName) {
         metadata.category = categoryName;
       }
     }
-
 
     if (metadata.subcategoryId && subcategoryMap) {
       const subcategoryName = subcategoryMap.get(
@@ -215,15 +213,13 @@ export class FileService {
       ? sortBy
       : undefined;
 
-    const cleanOrder = validOrders.includes(order as string)
-      ? order
-      : 'desc';
+    const cleanOrder = validOrders.includes(order as string) ? order : 'desc';
 
     const orderBy:
       | Prisma.FileAssetOrderByWithRelationInput
       | Prisma.FileAssetOrderByWithRelationInput[] = cleanSortBy
-        ? { [cleanSortBy]: cleanOrder }
-        : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
+      ? { [cleanSortBy]: cleanOrder }
+      : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
 
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({
@@ -256,16 +252,12 @@ export class FileService {
     ]);
 
     const categoryIds = files
-      .map((f) =>
-        f.metadata.find((m) => m.key === 'categoryId')?.value
-      )
+      .map((f) => f.metadata.find((m) => m.key === 'categoryId')?.value)
       .filter(Boolean)
       .map(Number);
 
     const subcategoryIds = files
-      .map((f) =>
-        f.metadata.find((m) => m.key === 'subcategoryId')?.value
-      )
+      .map((f) => f.metadata.find((m) => m.key === 'subcategoryId')?.value)
       .filter(Boolean)
       .map(Number);
 
@@ -318,21 +310,16 @@ export class FileService {
       throw new NotFoundException('Category not found');
     }
 
-    const categoryName =
-      category.translations?.[0]?.name?.trim();
+    const categoryName = category.translations?.[0]?.name?.trim();
 
     const where: Prisma.FileAssetWhereInput = {
       ...(type && { fileType: type }),
 
       OR: [
-
         {
           metadata: {
             some: {
-              AND: [
-                { key: 'categoryId' },
-                { value: String(categoryId) },
-              ],
+              AND: [{ key: 'categoryId' }, { value: String(categoryId) }],
             },
           },
         },
@@ -375,20 +362,13 @@ export class FileService {
       this.prisma.fileAsset.count({ where }),
     ]);
 
-
-
     const categoryIds = files
-      .map((f) =>
-        f.metadata.find((m) => m.key === 'categoryId')?.value
-      )
+      .map((f) => f.metadata.find((m) => m.key === 'categoryId')?.value)
       .filter(Boolean)
       .map(Number);
 
-
     const subcategoryIds = files
-      .map((f) =>
-        f.metadata.find((m) => m.key === 'subcategoryId')?.value
-      )
+      .map((f) => f.metadata.find((m) => m.key === 'subcategoryId')?.value)
       .filter(Boolean)
       .map(Number);
 
@@ -397,12 +377,10 @@ export class FileService {
       include: { translations: true },
     });
 
-
     const subcategories = await this.prisma.subcategory.findMany({
       where: { id: { in: subcategoryIds } },
       include: { translations: true },
     });
-
 
     const categoryMap = new Map<number, string>();
     categories.forEach((c) => {
@@ -443,7 +421,6 @@ export class FileService {
   ) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
-
     const subcategory = await this.prisma.subcategory.findUnique({
       where: { id: subcategoryId },
       include: {
@@ -451,20 +428,17 @@ export class FileService {
       },
     });
 
-    const subcategoryNames =
-      subcategory?.translations.map(t => t.name) || [];
+    const subcategoryNames = subcategory?.translations.map((t) => t.name) || [];
 
     const where: Prisma.FileAssetWhereInput = {
       ...(type && { fileType: type }),
 
       OR: [
-
         {
           contentType: {
             subcategoryId,
           },
         },
-
 
         {
           metadata: {
@@ -506,7 +480,6 @@ export class FileService {
       take,
     };
   }
-
 
   async getFileIndex(
     groupBy: 'year' | 'contentType' | 'category',
@@ -661,51 +634,48 @@ export class FileService {
     };
   }
 
-
-
   async deleteFile(id: number) {
-    const file = await this.prisma.fileAsset.findUnique({
-      where: { id },
-    });
+  const file = await this.prisma.fileAsset.findUnique({
+    where: { id },
+  });
 
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-
-
-    try {
-      if (file.storageKey?.includes('res.cloudinary.com')) {
-
-        const publicId = this.extractPublicId(file.storageKey);
-        await cloudinary.uploader.destroy(publicId);
-      } else {
-
-        const filePath = path.join(process.cwd(), 'uploads', file.storageKey);
-
-        await fs.unlink(filePath).catch(() => {
-          console.warn('Local file not found or already deleted');
-        });
-      }
-    } catch (err) {
-      console.warn('Storage deletion failed:', err.message);
-    }
-
-
-    await this.prisma.$transaction([
-      this.prisma.fileMetadata.deleteMany({
-        where: { fileId: id },
-      }),
-      this.prisma.fileTranslation.deleteMany({
-        where: { fileId: id },
-      }),
-      this.prisma.fileAsset.delete({
-        where: { id },
-      }),
-    ]);
-
-    return {
-      success: true,
-      deletedId: id,
-    };
+  if (!file) {
+    throw new NotFoundException('File not found');
   }
+
+  try {
+    if (file.storageKey) {
+      
+      const url = new URL(file.storageKey);
+      const key = url.pathname.substring(1); 
+
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME!,
+          Key: key,
+        }),
+      );
+    }
+  } catch (err) {
+    console.warn('S3 deletion failed:', err.message);
+  }
+
+ 
+  await this.prisma.$transaction([
+    this.prisma.fileMetadata.deleteMany({
+      where: { fileId: id },
+    }),
+    this.prisma.fileTranslation.deleteMany({
+      where: { fileId: id },
+    }),
+    this.prisma.fileAsset.delete({
+      where: { id },
+    }),
+  ]);
+
+  return {
+    success: true,
+    deletedId: id,
+  };
+}
 }

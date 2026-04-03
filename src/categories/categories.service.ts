@@ -18,7 +18,7 @@ export class CategoryService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) { }
+  ) {}
 
   private async invalidateCache() {
     const currentVersion =
@@ -28,15 +28,12 @@ export class CategoryService {
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
-
     const english = dto.translations.find((t) => t.languageCode === 'en');
     // const hindi = dto.translations.find((t) => t.languageCode === 'hi');
-
 
     const slugSource = english?.name?.trim();
 
     let slug: string;
-
 
     if (slugSource) {
       slug = generateSlug(slugSource);
@@ -66,14 +63,10 @@ export class CategoryService {
           );
         }
       }
-
-    }
-
-    else {
+    } else {
       slug = `category-${nanoid(5)}`;
     }
     try {
-
       const category = await this.prisma.category.create({
         data: {
           slug,
@@ -81,12 +74,10 @@ export class CategoryService {
             create: dto.translations.map((t) => ({
               ...t,
               name: t.name.trim().normalize('NFC'),
-            }))
+            })),
           },
         },
       });
-
-
 
       await this.prisma.$executeRaw`
     UPDATE category c
@@ -105,7 +96,6 @@ export class CategoryService {
 
       await this.invalidateCache();
       return category;
-
     } catch (error) {
       if (error.code === 'P2002') {
         throw new BadRequestException(
@@ -117,8 +107,7 @@ export class CategoryService {
   }
 
   async findAll(lang: string, skip = 0, take = 20) {
-    const version =
-      (await this.cache.get<number>('categories:version')) || 1;
+    const version = (await this.cache.get<number>('categories:version')) || 1;
 
     const cacheKey = `categories:${version}:${lang}:${skip}:${take}`;
 
@@ -130,8 +119,7 @@ export class CategoryService {
     const [categories, total] = await Promise.all([
       this.prisma.category.findMany({
         include: { translations: true },
-        orderBy: [{ createdAt: 'asc' },
-        { id: 'asc' }],
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         skip,
         take,
       }),
@@ -172,7 +160,7 @@ export class CategoryService {
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
-      include: { translations: true }
+      include: { translations: true },
     });
 
     if (!category) {
@@ -210,9 +198,7 @@ export class CategoryService {
       );
     }
 
-    const newEnglish = dto.translations?.find(
-      (t) => t.languageCode === 'en',
-    );
+    const newEnglish = dto.translations?.find((t) => t.languageCode === 'en');
 
     if (newEnglish?.name?.trim()) {
       const newSlugBase = generateSlug(newEnglish.name);
@@ -241,7 +227,6 @@ export class CategoryService {
         });
       }
     }
-
 
     await this.prisma.$executeRaw`
   UPDATE category c

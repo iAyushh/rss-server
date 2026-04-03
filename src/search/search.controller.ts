@@ -3,11 +3,10 @@ import { SearchService } from './search.service';
 import { SearchablePaginatedDto } from '@Common';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
-
 @ApiBearerAuth()
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) { }
+  constructor(private readonly searchService: SearchService) {}
 
   @Get()
   async globalSearch(@Query() dto: SearchablePaginatedDto) {
@@ -26,25 +25,25 @@ export class SearchController {
       extractedYear,
     );
   }
-@Get('files')
-@ApiQuery({
-  name: 'sortBy',
-  required: false,
-  enum: ['updatedAt', 'fileSize', 'originalName', 'name'],
-})
-@ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
-async searchFiles(@Query() dto: SearchablePaginatedDto) {
-  const skip = Number(dto.skip ?? 0);
-  const take = Number(dto.take ?? 20);
+  @Get('files')
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['updatedAt', 'fileSize', 'originalName', 'name'],
+  })
+  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  async searchFiles(@Query() dto: SearchablePaginatedDto) {
+    const skip = Number(dto.skip ?? 0);
+    const take = Number(dto.take ?? 20);
 
-  return this.searchService.searchFiles(
-    dto.search ?? '',
-    dto.languageCode ?? 'hi',
-    skip,
-    take,
-    dto.year ? Number(dto.year) : undefined,
-    dto.sortBy,   
-    dto.order,    
-  );
-}
+    return this.searchService.searchFiles(
+      dto.search ?? '',
+      dto.languageCode ?? 'hi',
+      skip,
+      take,
+      dto.year ? Number(dto.year) : undefined,
+      dto.sortBy,
+      dto.order,
+    );
+  }
 }

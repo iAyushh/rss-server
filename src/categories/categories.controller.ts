@@ -22,7 +22,7 @@ import { UserType } from '@Common';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('categories')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) { }
+  constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
   create(@Body() dto: CreateCategoryRequestDto, @I18nLang() lang: string) {

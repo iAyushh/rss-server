@@ -34,7 +34,7 @@ export class SearchablePaginatedDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  sortBy?: 'updatedAt' | 'fileSize' | 'originalName'| 'name';
+  sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name';
 
   @ApiPropertyOptional()
   @IsOptional()
