@@ -8,6 +8,7 @@ import {
   Patch,
   UseGuards,
   Query,
+  Res,
 } from '@nestjs/common';
 import { CategoryService } from './categories.service';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
@@ -15,6 +16,7 @@ import { I18nLang } from 'nestjs-i18n';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessGuard, JwtAuthGuard, RolesGuard, Roles } from '@Common';
 import { UserType } from '@Common';
+import { Response } from 'express';
 
 @ApiBearerAuth()
 @ApiTags('Category')
@@ -30,18 +32,20 @@ export class CategoryController {
   }
 
   @Get()
-  findAll(
-    @I18nLang() lang: string,
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-  ) {
-    return this.categoryService.findAll(
-      lang,
-      skip ? Number(skip) : 0,
-      take ? Number(take) : 20,
-    );
-  }
+findAll(
+  @I18nLang() lang: string,
+  @Res({ passthrough: true }) res: Response,
+  @Query('skip') skip?: number,
+  @Query('take') take?: number,
+) {
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
 
+  return this.categoryService.findAll(
+    lang,
+    skip ? Number(skip) : 0,
+    take ? Number(take) : 20,
+  );
+}
   @Patch(':id')
   update(
     @Param('id') id: string,

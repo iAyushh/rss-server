@@ -47,7 +47,7 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
       stores: process.env.REDIS_URI
         ? [new KeyvRedis(process.env.REDIS_URI)]
         : undefined,
-      ttl: 600 * 1000,
+      ttl: 600 ,
     }),
 
     EventEmitterModule.forRoot(),

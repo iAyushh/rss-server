@@ -8,6 +8,7 @@ import {
   Query,
   Body,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import { FileService } from './file.service';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -22,6 +23,7 @@ import {
 } from '@Common';
 import { I18nLang } from 'nestjs-i18n';
 import { UpdateFileRequestDto } from './dto';
+import { Response } from 'express';
 
 @ApiBearerAuth()
 @ApiTags('Files')
@@ -29,7 +31,7 @@ import { UpdateFileRequestDto } from './dto';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) {}
+  constructor(private readonly fileService: FileService) { }
 
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
@@ -51,7 +53,10 @@ export class FileController {
     @Query() pagination?: PaginatedDto,
     @Query('lang') queryLang?: string,
     @I18nLang() i18nLang?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
+    res?.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+
     const lang = queryLang ?? i18nLang ?? 'hi';
 
     return this.fileService.getAllFiles({
@@ -80,7 +85,10 @@ export class FileController {
     @Query('skip') skip?: number,
     @Query('take') take?: number,
     @I18nLang() i18nLang?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
+    res?.setHeader('Cache-Control', 'public, max-age=120, s-maxage=600');
+
     const lang = queryLang ?? i18nLang ?? 'hi';
 
     return this.fileService.getFileIndex(
@@ -102,7 +110,10 @@ export class FileController {
     @Query('type') type?: FileType,
     @Query('lang') queryLang?: string,
     @I18nLang() i18nLang?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
+    res?.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+
     const lang = queryLang ?? i18nLang ?? 'hi';
 
     return this.fileService.getFilesByContentType(id, {
@@ -122,7 +133,10 @@ export class FileController {
     @I18nLang() i18nLang: string,
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
+    @Res({ passthrough: true }) res?: Response,
   ) {
+    res?.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+
     const lang = queryLang ?? i18nLang ?? 'hi';
 
     return this.fileService.getFilesByCategory(id, {
@@ -142,7 +156,10 @@ export class FileController {
     @I18nLang() i18nLang: string,
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
+    @Res({ passthrough: true }) res?: Response,
   ) {
+    res?.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+
     const lang = queryLang ?? i18nLang ?? 'hi';
 
     return this.fileService.getFilesBySubcategory(id, {
@@ -158,7 +175,10 @@ export class FileController {
   getAllContentTypes(
     @Query('lang') queryLang?: string,
     @I18nLang() i18nLang?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
+    res?.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900');
+
     const lang = queryLang ?? i18nLang ?? 'hi';
     return this.fileService.getAllContentTypes(lang);
   }

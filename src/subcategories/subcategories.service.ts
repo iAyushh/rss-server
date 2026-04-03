@@ -21,11 +21,13 @@ export class SubcategoriesService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) {}
+  ) { }
 
-  private async invalidateCache(categoryId: number) {
-    await this.cache.del(`subcategories:${categoryId}:hi`);
-    await this.cache.del(`subcategories:${categoryId}:en`);
+  private async invalidateCache() {
+    const version =
+      (await this.cache.get<number>('subcategories:version')) || 1;
+
+    await this.cache.set('subcategories:version', version + 1, 0);
   }
 
   async create(dto: CreateSubcategoryRequestDto, lang: string) {
@@ -101,21 +103,37 @@ SET search_vector =
 WHERE s.id = ${subcategory.id};
 `;
 
-    await this.invalidateCache(dto.categoryId);
+    await this.invalidateCache();
     return subcategory;
   }
 
   async findByCategory(categoryId: number, lang: string, skip = 0, take = 10) {
-    const cacheKey = `subcategories:${categoryId}:${lang}`;
+    const version =
+      (await this.cache.get<number>('subcategories:version')) || 1;
 
-    const cached = await this.cache.get(cacheKey);
+    const cacheKey = `subcategories:${version}:${categoryId}:${lang}:${skip}:${take}`;
+
+    const cached = await this.cache.get<{ result: any[]; total: number }>(cacheKey);
     if (cached) return cached;
+
+    const languages = lang === 'hi' ? ['hi'] : [lang, 'hi'];
 
     const [subcategories, total] = await Promise.all([
       this.prisma.subcategory.findMany({
         where: { categoryId },
-        include: { translations: true },
-        orderBy: { createdAt: 'asc' },
+        include: {
+          translations: {
+            where: {
+              languageCode: {
+                in: languages,
+              },
+            },
+          },
+        },
+        orderBy: [
+          { createdAt: 'asc' },
+          { id: 'asc' },
+        ],
         skip,
         take,
       }),
@@ -129,13 +147,13 @@ WHERE s.id = ${subcategory.id};
         (t: SubcategoryTranslation) => t.languageCode === lang,
       );
 
-      if (!translation && lang !== 'hi') {
+      if (!translation) {
         translation = sub.translations.find(
           (t: SubcategoryTranslation) => t.languageCode === 'hi',
         );
       }
 
-      if (!translation) {
+      if (!translation && sub.translations.length > 0) {
         translation = sub.translations[0];
       }
 
@@ -143,13 +161,17 @@ WHERE s.id = ${subcategory.id};
         id: sub.id,
         slug: sub.slug,
         categoryId: sub.categoryId,
-        lang: translation.languageCode,
-        name: translation.name,
-        description: translation.description,
+        lang: translation?.languageCode || lang,
+        name: translation?.name || '',
+        description: translation?.description || null,
       };
     });
-    await this.cache.set(cacheKey, result, 600 * 1000);
-    return { result, total };
+
+    const finalResult = { result, total };
+
+    await this.cache.set(cacheKey, finalResult, 600);
+
+    return finalResult;
   }
 
   async update(id: number, dto: UpdateSubcategoryRequestDto, lang: string) {
@@ -235,7 +257,7 @@ SET search_vector =
 WHERE s.id = ${id};
 `;
 
-    await this.invalidateCache(subcategory.categoryId);
+    await this.invalidateCache();
 
     return {
       message: this.i18n.t('common.success.SUBCATEGORY_UPDATED', { lang }),
@@ -257,7 +279,7 @@ WHERE s.id = ${id};
       where: { id },
     });
 
-    await this.invalidateCache(subcategory.categoryId);
+    await this.invalidateCache();
 
     return {
       message: this.i18n.t('common.success.SUBCATEGORY_DELETED', { lang }),
