@@ -17,11 +17,13 @@ export class ContentTypeService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) {}
+  ) { }
 
   private async invalidateCache() {
-    await this.cache.del('content-types:hi');
-    await this.cache.del('content-types:en');
+    const version =
+      (await this.cache.get<number>('content-types:version')) || 1;
+
+    await this.cache.set('content-types:version', version + 1, 0);
   }
 
   async create(dto: CreateContentTypeDto) {
@@ -79,11 +81,11 @@ export class ContentTypeService {
 
           metadata: dto.metadata
             ? {
-                create: dto.metadata.map((m) => ({
-                  key: m.key,
-                  value: m.value,
-                })),
-              }
+              create: dto.metadata.map((m) => ({
+                key: m.key,
+                value: m.value,
+              })),
+            }
             : undefined,
         },
 
@@ -113,223 +115,255 @@ WHERE ct.id = ${content.id};
   }
 
   async findAll(
-    lang: string,
-    categoryId?: number,
-    subcategoryId?: number,
-    skip = 0,
-    take = 10,
-  ) {
-    const cacheKey = `content-types:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}`;
+  lang: string,
+  categoryId?: number,
+  subcategoryId?: number,
+  skip = 0,
+  take = 10,
+) {
+  const version =
+    (await this.cache.get<number>('content-types:version')) || 1;
 
-    const cached = await this.cache.get(cacheKey);
-    if (cached) return cached;
+  const cacheKey = `content-types:${version}:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}:${skip}:${take}`;
 
-    const [contents, total] = await Promise.all([
-      this.prisma.contentType.findMany({
-        where: {
-          categoryId: categoryId ?? undefined,
-          subcategoryId: subcategoryId ?? undefined,
-        },
-        include: {
-          translations: true,
-          category: { select: { id: true, slug: true } },
-          subcategory: { select: { id: true, slug: true } },
-        },
-        orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
-        skip,
-        take,
-      }),
-      this.prisma.contentType.count({
-        where: {
-          categoryId: categoryId ?? undefined,
-          subcategoryId: subcategoryId ?? undefined,
-        },
-      }),
-    ]);
-    const result = contents
-      .filter((content) => content.translations.length > 0)
-      .map((content) => {
-        const translation =
-          content.translations.find((t) => t.languageCode === lang) ??
-          (lang !== 'hi'
-            ? content.translations.find((t) => t.languageCode === 'hi')
-            : null) ??
-          content.translations[0];
+  const cached = await this.cache.get<{ data: any[]; total: number }>(cacheKey);
+  if (cached) return cached;
 
-        return {
-          id: content.id,
-          categoryId: content.categoryId,
-          subcategoryId: content.subcategoryId,
-          categorySlug: content.category.slug,
-          subcategorySlug: content.subcategory?.slug ?? null,
-          contentYear: content.contentYear,
-          lang: translation.languageCode,
-          name: translation.name,
-          description: translation.description,
-          createdAt: content.createdAt,
-        };
-      });
-    await this.cache.set(cacheKey, result, 300);
-    return { data: result, total };
-  }
+  const languages = lang === 'hi' ? ['hi'] : [lang, 'hi'];
 
-  async getContentByYearSlug(
-    year: number,
-    categorySlug: string,
-    contentSlug: string,
-    lang: string,
-  ) {
-    const content = await this.prisma.contentType.findFirst({
+  const [contents, total] = await Promise.all([
+    this.prisma.contentType.findMany({
       where: {
-        slug: contentSlug,
-        category: {
-          slug: categorySlug,
-        },
-        files: {
-          some: {
-            contentYear: year,
-          },
-        },
+        categoryId: categoryId ?? undefined,
+        subcategoryId: subcategoryId ?? undefined,
       },
       include: {
-        translations: true,
-        category: true,
-        subcategory: true,
-        files: {
+        translations: {
           where: {
-            contentYear: year,
+            languageCode: {
+              in: languages,
+            },
           },
-          include: {
-            translations: true,
-            metadata: true,
-          },
-          orderBy: { uploadedAt: 'desc' },
         },
+        category: { select: { id: true, slug: true } },
+        subcategory: { select: { id: true, slug: true } },
       },
-    });
+      orderBy: [
+        { contentYear: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
+      skip,
+      take,
+    }),
+    this.prisma.contentType.count({
+      where: {
+        categoryId: categoryId ?? undefined,
+        subcategoryId: subcategoryId ?? undefined,
+      },
+    }),
+  ]);
 
-    if (!content) {
-      throw new NotFoundException('Content not found.');
-    }
-
-    const translation =
+  const result = contents.map((content) => {
+    let translation =
       content.translations.find((t) => t.languageCode === lang) ??
-      (lang !== 'hi'
-        ? content.translations.find((t) => t.languageCode === 'hi')
-        : null) ??
+      content.translations.find((t) => t.languageCode === 'hi') ??
       content.translations[0];
 
     return {
       id: content.id,
-      slug: content.slug,
-      contentYear: content.contentYear,
+      categoryId: content.categoryId,
+      subcategoryId: content.subcategoryId,
       categorySlug: content.category.slug,
       subcategorySlug: content.subcategory?.slug ?? null,
-      name: translation.name,
-      description: translation.description,
-      files: content.files.map((f) => ({
-        id: f.id,
-        url: `${process.env.APP_URL}/uploads/${f.storageKey}`,
-        fileType: f.fileType,
-        uploadedAt: f.uploadedAt,
-        displayName:
-          f.translations.find((t) => t.languageCode === lang)?.displayName ??
-          f.translations.find((t) => t.languageCode === 'hi')?.displayName ??
-          f.translations[0]?.displayName ??
-          f.originalName,
-      })),
+      contentYear: content.contentYear,
+      lang: translation?.languageCode || lang,
+      name: translation?.name || '',
+      description: translation?.description || null,
+      createdAt: content.createdAt,
     };
+  });
+
+  const finalResult = { data: result, total };
+
+  await this.cache.set(cacheKey, finalResult, 300);
+
+  return finalResult;
+}
+
+  async getContentByYearSlug(
+  year: number,
+  categorySlug: string,
+  contentSlug: string,
+  lang: string,
+) {
+  const version =
+    (await this.cache.get<number>('content-types:version')) || 1;
+
+  const cacheKey = `content-types:detail:${version}:${year}:${categorySlug}:${contentSlug}:${lang}`;
+
+  const cached = await this.cache.get(cacheKey);
+  if (cached) return cached;
+
+  const content = await this.prisma.contentType.findFirst({
+    where: {
+      slug: contentSlug,
+      category: { slug: categorySlug },
+      files: {
+        some: { contentYear: year },
+      },
+    },
+    include: {
+      translations: true,
+      category: true,
+      subcategory: true,
+      files: {
+        where: { contentYear: year },
+        include: {
+          translations: true,
+          metadata: true,
+        },
+        orderBy: { uploadedAt: 'desc' },
+      },
+    },
+  });
+
+  if (!content) {
+    throw new NotFoundException('Content not found.');
   }
+
+  const translation =
+    content.translations.find((t) => t.languageCode === lang) ??
+    content.translations.find((t) => t.languageCode === 'hi') ??
+    content.translations[0];
+
+  const result = {
+    id: content.id,
+    slug: content.slug,
+    contentYear: content.contentYear,
+    categorySlug: content.category.slug,
+    subcategorySlug: content.subcategory?.slug ?? null,
+    name: translation?.name || '',
+    description: translation?.description || null,
+    files: content.files.map((f) => ({
+      id: f.id,
+      url: `${process.env.APP_URL}/uploads/${f.storageKey}`,
+      fileType: f.fileType,
+      uploadedAt: f.uploadedAt,
+      displayName:
+        f.translations.find((t) => t.languageCode === lang)?.displayName ??
+        f.translations.find((t) => t.languageCode === 'hi')?.displayName ??
+        f.translations[0]?.displayName ??
+        f.originalName,
+    })),
+  };
+
+  await this.cache.set(cacheKey, result, 600);
+
+  return result;
+}
 
   async getIndexNavigation(lang: string) {
-    const contents = await this.prisma.contentType.findMany({
-      include: {
-        translations: true,
-        category: {
-          include: {
-            translations: true,
-          },
-        },
-        subcategory: {
-          include: {
-            translations: true,
-          },
+  const version =
+    (await this.cache.get<number>('content-types:version')) || 1;
+
+  const cacheKey = `content-types:index:${version}:${lang}`;
+
+  const cached = await this.cache.get(cacheKey);
+  if (cached) return cached;
+
+  const contents = await this.prisma.contentType.findMany({
+    include: {
+      translations: true,
+      category: {
+        include: {
+          translations: true,
         },
       },
-      orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
-    });
+      subcategory: {
+        include: {
+          translations: true,
+        },
+      },
+    },
+    orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
+  });
 
-    const result: Record<number, any> = {};
+  const result: Record<number, any> = {};
 
-    for (const content of contents) {
-      const year = content.contentYear;
+  for (const content of contents) {
+    const year = content.contentYear;
 
-      if (!result[year]) {
-        result[year] = {
-          year,
-          categories: {},
-        };
-      }
-
-      const category = content.category;
-      const categoryTranslation =
-        category.translations.find((t) => t.languageCode === lang) ??
-        category.translations.find((t) => t.languageCode === 'hi') ??
-        category.translations[0];
-
-      if (!result[year].categories[category.slug]) {
-        result[year].categories[category.slug] = {
-          slug: category.slug,
-          name: categoryTranslation.name,
-          subcategories: {},
-        };
-      }
-
-      const subcategory = content.subcategory;
-
-      if (subcategory) {
-        const subTranslation =
-          subcategory.translations.find((t) => t.languageCode === lang) ??
-          subcategory.translations.find((t) => t.languageCode === 'hi') ??
-          subcategory.translations[0];
-
-        if (
-          !result[year].categories[category.slug].subcategories[
-            subcategory.slug
-          ]
-        ) {
-          result[year].categories[category.slug].subcategories[
-            subcategory.slug
-          ] = {
-            slug: subcategory.slug,
-            name: subTranslation.name,
-            contents: [],
-          };
-        }
-
-        const translation =
-          content.translations.find((t) => t.languageCode === lang) ??
-          content.translations.find((t) => t.languageCode === 'hi') ??
-          content.translations[0];
-
-        result[year].categories[category.slug].subcategories[
-          subcategory.slug
-        ].contents.push({
-          slug: content.slug,
-          name: translation.name,
-        });
-      }
+    if (!result[year]) {
+      result[year] = {
+        year,
+        categories: {},
+      };
     }
 
-    return Object.values(result).map((yearBlock: any) => ({
-      year: yearBlock.year,
-      categories: Object.values(yearBlock.categories).map((cat: any) => ({
-        slug: cat.slug,
-        name: cat.name,
-        subcategories: Object.values(cat.subcategories),
-      })),
-    }));
+    const category = content.category;
+    const categoryTranslation =
+      category.translations.find((t) => t.languageCode === lang) ??
+      category.translations.find((t) => t.languageCode === 'hi') ??
+      category.translations[0];
+
+    if (!result[year].categories[category.slug]) {
+      result[year].categories[category.slug] = {
+        slug: category.slug,
+        name: categoryTranslation.name,
+        subcategories: {},
+      };
+    }
+
+    const subcategory = content.subcategory;
+
+    if (subcategory) {
+      const subTranslation =
+        subcategory.translations.find((t) => t.languageCode === lang) ??
+        subcategory.translations.find((t) => t.languageCode === 'hi') ??
+        subcategory.translations[0];
+
+      if (
+        !result[year].categories[category.slug].subcategories[
+          subcategory.slug
+        ]
+      ) {
+        result[year].categories[category.slug].subcategories[
+          subcategory.slug
+        ] = {
+          slug: subcategory.slug,
+          name: subTranslation.name,
+          contents: [],
+        };
+      }
+
+      const translation =
+        content.translations.find((t) => t.languageCode === lang) ??
+        content.translations.find((t) => t.languageCode === 'hi') ??
+        content.translations[0];
+
+      result[year].categories[category.slug].subcategories[
+        subcategory.slug
+      ].contents.push({
+        slug: content.slug,
+        name: translation.name,
+      });
+    }
   }
+
+  const finalResult = Object.values(result).map((yearBlock: any) => ({
+    year: yearBlock.year,
+    categories: Object.values(yearBlock.categories).map((cat: any) => ({
+      slug: cat.slug,
+      name: cat.name,
+      subcategories: Object.values(cat.subcategories),
+    })),
+  }));
+
+  await this.cache.set(cacheKey, finalResult, 600);
+
+  return finalResult;
+}
 
   async update(id: number, dto: UpdateContentTypeDto, lang: string) {
     const exists = await this.prisma.contentType.findUnique({
