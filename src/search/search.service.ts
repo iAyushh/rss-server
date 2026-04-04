@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Cache } from 'cache-manager';
 import { PrismaService } from 'src/prisma';
 
 type FileWithRelations = Prisma.FileAssetGetPayload<{
@@ -23,7 +25,9 @@ type FileWithRelations = Prisma.FileAssetGetPayload<{
 }>;
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
+  ) { }
 
   private parseSearchQuery(query: string) {
     const tokens = query.trim().split(/\s+/);
@@ -52,6 +56,16 @@ export class SearchService {
     take = 20,
     year?: number,
   ) {
+
+
+
+    const normalizedQuery = (query || '').trim().toLowerCase();
+
+    const cacheKey = `search:global:${normalizedQuery}:${languageCode}:${skip}:${take}:${year ?? 'all'}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     if ((!query || !query.trim()) && !year) {
       return [];
     }
@@ -73,7 +87,7 @@ export class SearchService {
       return [];
     }
 
-    return this.prisma.$queryRaw(
+    const result = await this.prisma.$queryRaw(
       Prisma.sql`
 
 SELECT * FROM (
@@ -207,6 +221,10 @@ ORDER BY year DESC NULLS LAST, rank DESC
 LIMIT ${take} OFFSET ${skip}
 `,
     );
+
+    await this.cache.set(cacheKey, result, 300);
+
+    return result;
   }
 
   async searchFiles(
@@ -218,6 +236,15 @@ LIMIT ${take} OFFSET ${skip}
     sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name',
     order?: 'asc' | 'desc',
   ) {
+
+
+    const normalizedQuery = (search || '').trim().toLowerCase();
+
+    const cacheKey = `search:files:${normalizedQuery}:${languageCode}:${skip}:${take}:${year ?? 'all'}:${sortBy ?? 'none'}:${order ?? 'desc'}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const lang = languageCode || 'hi';
 
     const sortFieldMap = {
@@ -363,9 +390,13 @@ LIMIT ${take} OFFSET ${skip}
       ? mappedFiles.slice(skip, skip + take)
       : mappedFiles;
 
-    return {
+    const finalResult = {
       files: finalFiles,
       total,
     };
+
+    await this.cache.set(cacheKey, finalResult, 300);
+
+    return finalResult;
   }
 }

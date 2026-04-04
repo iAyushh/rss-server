@@ -18,31 +18,31 @@ export class IngestionService {
     private readonly i18n: I18nService,
   ) {}
 
-  private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const originalName = file.originalname;
-      const baseName = originalName.replace(/\.[^/.]+$/, '');
+  // private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
+  //   return new Promise((resolve, reject) => {
+  //     const originalName = file.originalname;
+  //     const baseName = originalName.replace(/\.[^/.]+$/, '');
 
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'rss-uploads',
-          resource_type: 'raw',
-          public_id: baseName,
-          overwrite: true,
-          access_mode: 'public',
-        },
-        (error, result) => {
-          if (error) {
-            return reject(error);
-          }
+  //     const stream = cloudinary.uploader.upload_stream(
+  //       {
+  //         folder: 'rss-uploads',
+  //         resource_type: 'raw',
+  //         public_id: baseName,
+  //         overwrite: true,
+  //         access_mode: 'public',
+  //       },
+  //       (error, result) => {
+  //         if (error) {
+  //           return reject(error);
+  //         }
 
-          resolve(result?.secure_url || '');
-        },
-      );
+  //         resolve(result?.secure_url || '');
+  //       },
+  //     );
 
-      stream.end(file.buffer);
-    });
-  }
+  //     stream.end(file.buffer);
+  //   });
+  // }
 
   async uploadToS3(file: Express.Multer.File): Promise<string> {
     const fileName = `${Date.now()}-${file.originalname}`;

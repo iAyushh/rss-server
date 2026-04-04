@@ -100,10 +100,10 @@ async function bootstrap() {
       persistAuthorization: true,
     },
   });
-  app.use(
-    '/uploads',
-    express.static(join(process.cwd(), process.env.STORAGE_DIR || 'uploads')),
-  );
+  // app.use(
+  //   '/uploads',
+  //   express.static(join(process.cwd(), process.env.STORAGE_DIR || 'uploads')),
+  // );
 
   await app.listen(configService.get('PORT'));
 
