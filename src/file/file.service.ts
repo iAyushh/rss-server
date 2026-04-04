@@ -33,7 +33,7 @@ export class FileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
-  ) {}
+  ) { }
 
   getPublicUrl(storageKey: string) {
     return storageKey;
@@ -218,8 +218,8 @@ export class FileService {
     const orderBy:
       | Prisma.FileAssetOrderByWithRelationInput
       | Prisma.FileAssetOrderByWithRelationInput[] = cleanSortBy
-      ? { [cleanSortBy]: cleanOrder }
-      : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
+        ? { [cleanSortBy]: cleanOrder }
+        : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
 
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({
@@ -443,10 +443,8 @@ export class FileService {
         {
           metadata: {
             some: {
-              key: 'subcategory',
-              value: {
-                in: subcategoryNames,
-              },
+              key: 'subcategoryId',
+              value: String(subcategoryId),
             },
           },
         },
@@ -635,47 +633,47 @@ export class FileService {
   }
 
   async deleteFile(id: number) {
-  const file = await this.prisma.fileAsset.findUnique({
-    where: { id },
-  });
-
-  if (!file) {
-    throw new NotFoundException('File not found');
-  }
-
-  try {
-    if (file.storageKey) {
-      
-      const url = new URL(file.storageKey);
-      const key = url.pathname.substring(1); 
-
-      await s3.send(
-        new DeleteObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME!,
-          Key: key,
-        }),
-      );
-    }
-  } catch (err) {
-    console.warn('S3 deletion failed:', err.message);
-  }
-
- 
-  await this.prisma.$transaction([
-    this.prisma.fileMetadata.deleteMany({
-      where: { fileId: id },
-    }),
-    this.prisma.fileTranslation.deleteMany({
-      where: { fileId: id },
-    }),
-    this.prisma.fileAsset.delete({
+    const file = await this.prisma.fileAsset.findUnique({
       where: { id },
-    }),
-  ]);
+    });
 
-  return {
-    success: true,
-    deletedId: id,
-  };
-}
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    try {
+      if (file.storageKey) {
+
+        const url = new URL(file.storageKey);
+        const key = url.pathname.substring(1);
+
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME!,
+            Key: key,
+          }),
+        );
+      }
+    } catch (err) {
+      console.warn('S3 deletion failed:', err.message);
+    }
+
+
+    await this.prisma.$transaction([
+      this.prisma.fileMetadata.deleteMany({
+        where: { fileId: id },
+      }),
+      this.prisma.fileTranslation.deleteMany({
+        where: { fileId: id },
+      }),
+      this.prisma.fileAsset.delete({
+        where: { id },
+      }),
+    ]);
+
+    return {
+      success: true,
+      deletedId: id,
+    };
+  }
 }
