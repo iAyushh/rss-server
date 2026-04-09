@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { FileType } from '@prisma/client';
 import {
   AccessGuard,
+  FileCategory,
   JwtAuthGuard,
   PaginatedDto,
   Roles,
@@ -35,7 +36,12 @@ export class FileController {
 
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
-  @ApiQuery({ name: 'type', required: false, enum: FileType })
+  @ApiQuery({
+  name: 'type',
+  required: false,
+  enum: FileCategory,
+  enumName: 'FileCategory',
+})
   @ApiQuery({
     name: 'sortBy',
     required: false,
@@ -47,7 +53,7 @@ export class FileController {
   @ApiQuery({ name: 'lang', required: false, type: String })
   async getAllFiles(
     @Query('contentTypeId') contentTypeId?: number,
-    @Query('type') type?: FileType,
+   @Query('type') type?: FileCategory,
     @Query('sortBy') sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
     @Query('order') order?: 'asc' | 'desc',
     @Query() pagination?: PaginatedDto,
