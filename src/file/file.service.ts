@@ -3,11 +3,10 @@ import { PrismaService } from 'src/prisma';
 import { Prisma, FileType } from '@prisma/client';
 import { I18nService } from 'nestjs-i18n';
 import { FileTranslationDto } from './dto';
-import { v2 as cloudinary } from 'cloudinary';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from 'src/configs/amazonS3.config';
+import { FileCategory } from 'src/common/types';
 
 type FileWithRelations = Prisma.FileAssetGetPayload<{
   include: {
@@ -27,6 +26,14 @@ type FileTranslationLite = {
   displayName: string;
   description: string | null;
 };
+
+const categoryToTypesMap: Record<FileCategory, FileType[]> = {
+  media: ['IMAGE', 'VIDEO', 'AUDIO'],
+  docs: ['PDF', 'WORD', 'TEXT'],
+  reports: ['CSV', 'EXCEL'],
+  others: ['OTHER'],
+};
+
 
 @Injectable()
 export class FileService {
@@ -182,9 +189,11 @@ export class FileService {
     };
   }
 
+
+
   async getAllFiles(options: {
     contentTypeId?: number;
-    type?: FileType;
+    type?: FileCategory;
     sortBy?: 'updatedAt' | 'fileSize' | 'originalName';
     order?: 'asc' | 'desc';
     skip?: number;
@@ -201,9 +210,19 @@ export class FileService {
       lang,
     } = options;
 
+    let fileTypes: FileType[] | undefined;
+
+    if (type) {
+      fileTypes = categoryToTypesMap[type];
+    }
+
     const where = {
       ...(contentTypeId && { contentTypeId }),
-      ...(type && { fileType: type }),
+      ...(fileTypes && {
+        fileType: {
+          in: fileTypes,
+        },
+      }),
     };
 
     const validSortFields = ['updatedAt', 'fileSize', 'originalName'];
@@ -298,6 +317,8 @@ export class FileService {
       take,
     };
   }
+
+
   async getFilesByCategory(categoryId: number, params?: any) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 

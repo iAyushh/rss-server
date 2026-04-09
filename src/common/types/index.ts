@@ -12,6 +12,13 @@ export enum Environment {
   Test = 'test',
 }
 
+export enum FileCategory {
+  MEDIA = 'media',
+  DOCS = 'docs',
+  REPORTS = 'reports',
+  OTHERS = 'others',
+}
+
 export class EnvironmentVariables {
   @IsEnum(NodeType)
   NODE_TYPE: NodeType;
