@@ -34,14 +34,20 @@ import { Response } from 'express';
 export class FileController {
   constructor(private readonly fileService: FileService) { }
 
+
+  @Get('stats')
+  getStats() {
+    return this.fileService.getFileStats();
+  }
+
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
   @ApiQuery({
-  name: 'type',
-  required: false,
-  enum: FileCategory,
-  enumName: 'FileCategory',
-})
+    name: 'type',
+    required: false,
+    enum: FileCategory,
+    enumName: 'FileCategory',
+  })
   @ApiQuery({
     name: 'sortBy',
     required: false,
@@ -53,7 +59,7 @@ export class FileController {
   @ApiQuery({ name: 'lang', required: false, type: String })
   async getAllFiles(
     @Query('contentTypeId') contentTypeId?: number,
-   @Query('type') type?: FileCategory,
+    @Query('type') type?: FileCategory,
     @Query('sortBy') sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
     @Query('order') order?: 'asc' | 'desc',
     @Query() pagination?: PaginatedDto,
@@ -103,6 +109,26 @@ export class FileController {
       Number(skip ?? 0),
       Number(take ?? 20),
     );
+  }
+
+  @Get('combined')
+  @ApiQuery({ name: 'type', required: false, enum: FileCategory })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiQuery({ name: 'lang', required: false, type: String })
+  async getCombinedFiles(
+    @Query('type') type?: FileCategory,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('lang') lang?: string,
+    @I18nLang() i18nLang?: string,
+  ) {
+    return this.fileService.getCombinedFiles({
+      type,
+      skip: Number(skip) || 0,
+      take: Number(take) || 20,
+      lang: lang ?? i18nLang ?? 'hi',
+    });
   }
 
   @Get('content-types/:id')
