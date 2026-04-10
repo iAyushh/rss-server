@@ -190,6 +190,162 @@ export class FileService {
   }
 
 
+  async getFileStats() {
+    const data = await this.prisma.fileAsset.groupBy({
+      by: ['fileType'],
+      _count: true,
+    });
+
+    let totalFiles = 0;
+    let totalMedia = 0;
+    let totalDocs = 0;
+    let totalReports = 0;
+
+    data.forEach((item) => {
+      const count = item._count;
+
+      totalFiles += count;
+
+      if (['IMAGE', 'VIDEO', 'AUDIO'].includes(item.fileType)) {
+        totalMedia += count;
+      } else if (['PDF', 'WORD', 'TEXT'].includes(item.fileType)) {
+        totalDocs += count;
+      } else if (['CSV', 'EXCEL'].includes(item.fileType)) {
+        totalReports += count;
+      }
+    });
+
+    return {
+      totalFiles,
+      totalDocs,
+      totalMedia,
+      totalReports,
+    };
+  }
+
+  async getCombinedFiles(options: {
+    type?: FileCategory;
+    skip: number;
+    take: number;
+    lang: string;
+  }) {
+    const { type, skip, take, lang } = options;
+
+
+    const categoryToTypesMap: Record<FileCategory, FileType[]> = {
+      [FileCategory.MEDIA]: ['IMAGE', 'VIDEO', 'AUDIO'],
+      [FileCategory.DOCS]: ['PDF', 'WORD', 'TEXT'],
+      [FileCategory.REPORTS]: ['CSV', 'EXCEL'],
+      [FileCategory.OTHERS]: ['OTHER'],
+    };
+
+    const fileTypes = type ? categoryToTypesMap[type] : undefined;
+
+    const where = {
+      ...(fileTypes && {
+        fileType: {
+          in: fileTypes,
+        },
+      }),
+    };
+
+
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [{ contentYear: 'desc' }, { updatedAt: 'desc' }],
+
+        include: {
+          translations: true,
+          metadata: true,
+        },
+      }),
+
+      this.prisma.fileAsset.count({ where }),
+    ]);
+
+
+    const categoryIds = new Set<number>();
+    const subcategoryIds = new Set<number>();
+
+    files.forEach((f) => {
+      const cat = f.metadata.find((m) => m.key === 'categoryId')?.value;
+      const sub = f.metadata.find((m) => m.key === 'subcategoryId')?.value;
+
+      if (cat) categoryIds.add(Number(cat));
+      if (sub) subcategoryIds.add(Number(sub));
+    });
+
+
+    const [categories, subcategories] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { id: { in: Array.from(categoryIds) } },
+        include: { translations: true },
+      }),
+      this.prisma.subcategory.findMany({
+        where: { id: { in: Array.from(subcategoryIds) } },
+        include: { translations: true },
+      }),
+    ]);
+
+
+    const categoryMap = new Map<number, string>();
+    categories.forEach((c) => {
+      const name =
+        c.translations.find((t) => t.languageCode === lang)?.name ||
+        c.translations[0]?.name;
+
+      if (name) categoryMap.set(c.id, name);
+    });
+
+    const subcategoryMap = new Map<number, string>();
+    subcategories.forEach((s) => {
+      const name =
+        s.translations.find((t) => t.languageCode === lang)?.name ||
+        s.translations[0]?.name;
+
+      if (name) subcategoryMap.set(s.id, name);
+    });
+
+
+    return {
+      data: files.map((f) => {
+        const categoryId = Number(
+          f.metadata.find((m) => m.key === 'categoryId')?.value,
+        );
+
+        const subcategoryId = Number(
+          f.metadata.find((m) => m.key === 'subcategoryId')?.value,
+        );
+
+        return {
+          id: f.id,
+          fileType: f.fileType,
+          url: f.url,
+          fileSize: f.fileSize,
+          contentYear: f.contentYear,
+          uploadedAt: f.uploadedAt,
+
+
+          category: categoryMap.get(categoryId) || null,
+          subcategory: subcategoryMap.get(subcategoryId) || null,
+
+          displayName:
+            f.translations.find((t) => t.languageCode === lang)?.displayName ||
+            f.translations[0]?.displayName ||
+            f.originalName,
+        };
+      }),
+
+      total,
+      skip,
+      take,
+    };
+  }
+
+
 
   async getAllFiles(options: {
     contentTypeId?: number;
