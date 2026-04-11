@@ -24,7 +24,7 @@ import { Response } from 'express';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('categories')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CategoryService) { }
 
   @Post()
   create(@Body() dto: CreateCategoryRequestDto, @I18nLang() lang: string) {
@@ -32,20 +32,40 @@ export class CategoryController {
   }
 
   @Get()
-findAll(
-  @I18nLang() lang: string,
-  @Res({ passthrough: true }) res: Response,
-  @Query('skip') skip?: number,
-  @Query('take') take?: number,
-) {
-  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+  findAll(
+    @I18nLang() lang: string,
+    @Res({ passthrough: true }) res: Response,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+  ) {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
 
-  return this.categoryService.findAll(
-    lang,
-    skip ? Number(skip) : 0,
-    take ? Number(take) : 20,
-  );
-}
+    return this.categoryService.findAll(
+      lang,
+      skip ? Number(skip) : 0,
+      take ? Number(take) : 20,
+    );
+  }
+
+
+  @Get(':categoryId/combined')
+  async getCategoryCombined(
+    @Param('categoryId') categoryId: number,
+    @Res({ passthrough: true }) res: Response,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('lang') lang?: string,
+    @I18nLang() i18nLang?: string,
+  ) {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+    return this.categoryService.getCategoryCombined({
+      categoryId: Number(categoryId),
+      skip: Number(skip) || 0,
+      take: Number(take) || 20,
+      lang: lang ?? i18nLang ?? 'hi',
+    });
+  }
+
   @Patch(':id')
   update(
     @Param('id') id: string,

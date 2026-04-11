@@ -157,6 +157,113 @@ export class CategoryService {
     return result;
   }
 
+
+
+  async getCategoryCombined(options: {
+  categoryId: number;
+  skip: number;
+  take: number;
+  lang: string;
+}) {
+  const { categoryId, skip, take, lang } = options;
+
+ 
+  const subcategories = await this.prisma.subcategory.findMany({
+    where: { categoryId },
+    include: { translations: true },
+  });
+
+  
+  const [files, total] = await Promise.all([
+    this.prisma.fileAsset.findMany({
+      where: {
+        metadata: {
+          some: {
+            key: 'categoryId',
+            value: String(categoryId),
+          },
+        },
+      },
+      skip,
+      take,
+      orderBy: [{ contentYear: 'desc' }, { updatedAt: 'desc' }],
+      include: {
+        translations: true,
+        metadata: true,
+      },
+    }),
+
+    this.prisma.fileAsset.count({
+      where: {
+        metadata: {
+          some: {
+            key: 'categoryId',
+            value: String(categoryId),
+          },
+        },
+      },
+    }),
+  ]);
+
+  
+  const formattedSubcategories = subcategories.map((s) => ({
+    id: s.id,
+    name:
+      s.translations.find((t) => t.languageCode === lang)?.name ||
+      s.translations[0]?.name,
+  }));
+
+ 
+  const subcategoryIds = new Set<number>();
+
+  files.forEach((f) => {
+    const subId = f.metadata.find(
+      (m) => m.key === 'subcategoryId',
+    )?.value;
+
+    if (subId) subcategoryIds.add(Number(subId));
+  });
+
+  // optional: map for quick lookup
+  const subcategoryMap = new Map<number, string>();
+  formattedSubcategories.forEach((s) => {
+    subcategoryMap.set(s.id, s.name);
+  });
+
+ 
+  return {
+    categoryId,
+
+    subcategories: formattedSubcategories, 
+
+    files: files.map((f) => {
+      const subcategoryId = Number(
+        f.metadata.find((m) => m.key === 'subcategoryId')?.value,
+      );
+
+      return {
+        id: f.id,
+        fileType: f.fileType,
+        url: f.url,
+        fileSize: f.fileSize,
+        contentYear: f.contentYear,
+
+        subcategoryId,
+        subcategory: subcategoryMap.get(subcategoryId) || null,
+
+        displayName:
+          f.translations.find((t) => t.languageCode === lang)?.displayName ||
+          f.translations[0]?.displayName ||
+          f.originalName,
+      };
+    }),
+
+    total, 
+    skip,
+    take,
+  };
+}
+
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
