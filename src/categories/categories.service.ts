@@ -247,17 +247,22 @@ export class CategoryService {
     }));
 
 
-    return {
-      categoryId,
+    const combinedData = [
+      
+      ...formattedSubcategories.map((s) => ({
+        type: 'subcategory',
+        id: s.id,
+        name: s.name,
+      })),
 
-      subcategories: formattedSubcategories,
-
-      files: files.map((f) => {
+      
+      ...files.map((f) => {
         const subcategoryId = Number(
           f.metadata.find((m) => m.key === 'subcategoryId')?.value,
         );
 
         return {
+          type: 'file',
           id: f.id,
           fileType: f.fileType,
           url: f.url,
@@ -274,7 +279,11 @@ export class CategoryService {
             f.originalName,
         };
       }),
+    ];
 
+    return {
+      categoryId,
+      data: combinedData,
       total,
       skip,
       take,
