@@ -179,7 +179,7 @@ export class CategoryService {
   }) {
     const { categoryId, skip, take, lang } = options;
 
-
+    // ✅ category fetch
     const category = await this.prisma.category.findUnique({
       where: { id: categoryId },
       include: { translations: true },
@@ -189,9 +189,11 @@ export class CategoryService {
       throw new NotFoundException('Category not found');
     }
 
-    const categoryName = category.translations?.[0]?.name?.trim();
+    const categoryName =
+      category.translations.find(t => t.languageCode === lang)?.name ||
+      category.translations[0]?.name;
 
-
+    // ✅ where condition
     const where: Prisma.FileAssetWhereInput = {
       OR: [
         {
@@ -219,65 +221,90 @@ export class CategoryService {
       ],
     };
 
-
-    const subcategories = await this.prisma.subcategory.findMany({
-      where: { categoryId },
-      include: { translations: true },
-    });
-
-
-    const [files, fileCount, subcategoryCount] = await Promise.all([
-      this.prisma.fileAsset.findMany({
-        where,
-        skip,
-        take,
-        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
-        include: {
-          metadata: { select: { key: true, value: true } },
-          translations: true,
-        },
-      }),
-
+    // ✅ counts
+    const [fileCount, subcategoryCount] = await Promise.all([
       this.prisma.fileAsset.count({ where }),
-
-      this.prisma.subcategory.count({
-        where: { categoryId },
-      }),
+      this.prisma.subcategory.count({ where: { categoryId } }),
     ]);
 
     const total = fileCount + subcategoryCount;
 
+    // ✅ pagination logic (CORRECT)
+    const subcategoryTake = Math.max(
+      0,
+      Math.min(subcategoryCount - skip, take),
+    );
+
+    const fileSkip = Math.max(0, skip - subcategoryCount);
+    const fileTake = take - subcategoryTake;
+
+    // ✅ fetch subcategories (paginated)
+    const subcategories =
+      subcategoryTake > 0
+        ? await this.prisma.subcategory.findMany({
+          where: { categoryId },
+          skip,
+          take: subcategoryTake,
+          select: {
+            id: true,
+            translations: {
+              where: { languageCode: lang },
+              select: { name: true },
+            },
+          },
+          orderBy: { id: 'asc' },
+        })
+        : [];
+
+    // ✅ fetch files (correct pagination)
+    const files =
+      fileTake > 0
+        ? await this.prisma.fileAsset.findMany({
+          where,
+          skip: fileSkip,
+          take: fileTake,
+          orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
+          select: {
+            id: true,
+            fileType: true,
+            url: true,
+            fileSize: true,
+            contentYear: true,
+            uploadedAt: true,
+            originalName: true,
+
+            metadata: {
+              select: { key: true, value: true },
+            },
+
+            translations: {
+              where: { languageCode: lang },
+              select: { displayName: true },
+            },
+          },
+        })
+        : [];
+
+
     const subcategoryMap = new Map<number, string>();
     subcategories.forEach((s) => {
-      const name =
-        s.translations.find((t) => t.languageCode === lang)?.name ||
-        s.translations[0]?.name;
-
+      const name = s.translations[0]?.name;
       if (name) subcategoryMap.set(s.id, name);
     });
 
 
-    const formattedSubcategories = subcategories.map((s) => ({
-      id: s.id,
-      name:
-        s.translations.find((t) => t.languageCode === lang)?.name ||
-        s.translations[0]?.name,
-    }));
-
-
     const combinedData = [
-
-      ...formattedSubcategories.map((s) => ({
+      ...subcategories.map((s) => ({
         type: 'subcategory',
         id: s.id,
-        name: s.name,
+        name: s.translations[0]?.name || null,
       })),
 
-
       ...files.map((f) => {
-        const subcategoryId = Number(
-          f.metadata.find((m) => m.key === 'subcategoryId')?.value,
-        );
+        const metaMap = new Map<string, string>();
+        f.metadata.forEach((m) => metaMap.set(m.key, m.value));
+
+        const subcategoryId = Number(metaMap.get('subcategoryId'));
 
         return {
           type: 'file',
@@ -292,9 +319,7 @@ export class CategoryService {
           subcategory: subcategoryMap.get(subcategoryId) || null,
 
           displayName:
-            f.translations.find((t) => t.languageCode === lang)?.displayName ||
-            f.translations[0]?.displayName ||
-            f.originalName,
+            f.translations[0]?.displayName || f.originalName,
         };
       }),
     ];
