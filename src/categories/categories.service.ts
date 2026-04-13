@@ -118,7 +118,20 @@ export class CategoryService {
 
     const [categories, total] = await Promise.all([
       this.prisma.category.findMany({
-        include: { translations: true },
+        select: {
+          id: true,
+          slug: true,
+          translations: {
+            where: {
+              languageCode: lang,
+            },
+            select: {
+              languageCode: true,
+              name: true,
+              description: true,
+            },
+          },
+        },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         skip,
         take,
@@ -156,7 +169,6 @@ export class CategoryService {
 
     return result;
   }
-
 
 
   async getCategoryCombined(options: {
@@ -214,7 +226,7 @@ export class CategoryService {
     });
 
 
-    const [files, total] = await Promise.all([
+    const [files, fileCount, subcategoryCount] = await Promise.all([
       this.prisma.fileAsset.findMany({
         where,
         skip,
@@ -225,9 +237,15 @@ export class CategoryService {
           translations: true,
         },
       }),
+
       this.prisma.fileAsset.count({ where }),
+
+      this.prisma.subcategory.count({
+        where: { categoryId },
+      }),
     ]);
 
+    const total = fileCount + subcategoryCount;
 
     const subcategoryMap = new Map<number, string>();
     subcategories.forEach((s) => {
@@ -248,14 +266,14 @@ export class CategoryService {
 
 
     const combinedData = [
-      
+
       ...formattedSubcategories.map((s) => ({
         type: 'subcategory',
         id: s.id,
         name: s.name,
       })),
 
-      
+
       ...files.map((f) => {
         const subcategoryId = Number(
           f.metadata.find((m) => m.key === 'subcategoryId')?.value,
