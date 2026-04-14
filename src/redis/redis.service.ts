@@ -9,7 +9,7 @@ import { EnvironmentVariables } from '@Common';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnApplicationShutdown {
-  client: Redis;
+  private client: Redis;
 
   constructor(
     private readonly configService: ConfigService<EnvironmentVariables, true>,
@@ -18,13 +18,30 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
   async onModuleInit() {
     this.client = new Redis(this.configService.get('REDIS_URI'), {
       lazyConnect: true,
+
+     
+      maxRetriesPerRequest: 1,
+
+     
+      enableReadyCheck: false,
     });
 
     this.client.on('error', (err: Error) => {
-      throw err;
+      console.error(' Redis Error:', err.message);
+    });
+
+    this.client.on('connect', () => {
+      console.log(' Redis connected');
     });
 
     await this.client.connect();
+  }
+
+  getClient(): Redis {
+    if (!this.client) {
+      throw new Error('Redis client not initialized');
+    }
+    return this.client;
   }
 
   async onApplicationShutdown() {
