@@ -123,14 +123,16 @@ export class CategoryService {
           slug: true,
           translations: {
             where: {
-              languageCode: lang,
+              languageCode: {
+                in: [lang, 'hi'],
+              },
             },
             select: {
               languageCode: true,
               name: true,
               description: true,
             },
-          },
+          }
         },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         skip,
@@ -140,26 +142,17 @@ export class CategoryService {
     ]);
 
     const data = categories.map((cat) => {
-      let translation = cat.translations.find(
-        (t: CategoryTranslation) => t.languageCode === lang,
-      );
-
-      if (!translation && lang !== 'hi') {
-        translation = cat.translations.find(
-          (t: CategoryTranslation) => t.languageCode === 'hi',
-        );
-      }
-
-      if (!translation) {
-        translation = cat.translations[0];
-      }
+      let translation =
+        cat.translations.find(t => t.languageCode === lang) ||
+        cat.translations.find(t => t.languageCode === 'hi') ||
+        cat.translations[0];
 
       return {
         id: cat.id,
         slug: cat.slug,
-        lang: translation.languageCode,
-        name: translation.name,
-        description: translation.description,
+        lang: translation?.languageCode,
+        name: translation?.name,
+        description: translation?.description,
       };
     });
 
@@ -179,7 +172,7 @@ export class CategoryService {
   }) {
     const { categoryId, skip, take, lang } = options;
 
-    // ✅ category fetch
+
     const category = await this.prisma.category.findUnique({
       where: { id: categoryId },
       include: { translations: true },
@@ -193,7 +186,7 @@ export class CategoryService {
       category.translations.find(t => t.languageCode === lang)?.name ||
       category.translations[0]?.name;
 
-    // ✅ where condition
+
     const where: Prisma.FileAssetWhereInput = {
       OR: [
         {
@@ -221,7 +214,7 @@ export class CategoryService {
       ],
     };
 
-    // ✅ counts
+
     const [fileCount, subcategoryCount] = await Promise.all([
       this.prisma.fileAsset.count({ where }),
       this.prisma.subcategory.count({ where: { categoryId } }),
@@ -229,7 +222,7 @@ export class CategoryService {
 
     const total = fileCount + subcategoryCount;
 
-    // ✅ pagination logic (CORRECT)
+
     const subcategoryTake = Math.max(
       0,
       Math.min(subcategoryCount - skip, take),
@@ -238,7 +231,7 @@ export class CategoryService {
     const fileSkip = Math.max(0, skip - subcategoryCount);
     const fileTake = take - subcategoryTake;
 
-    // ✅ fetch subcategories (paginated)
+
     const subcategories =
       subcategoryTake > 0
         ? await this.prisma.subcategory.findMany({
@@ -256,7 +249,7 @@ export class CategoryService {
         })
         : [];
 
-    // ✅ fetch files (correct pagination)
+
     const files =
       fileTake > 0
         ? await this.prisma.fileAsset.findMany({
