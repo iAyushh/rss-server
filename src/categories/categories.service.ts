@@ -124,7 +124,7 @@ export class CategoryService {
           translations: {
             where: {
               languageCode: {
-                in: [lang, 'hi'],
+                in: ['en', 'hi'],
               },
             },
             select: {
@@ -142,17 +142,17 @@ export class CategoryService {
     ]);
 
     const data = categories.map((cat) => {
-      let translation =
+      const translation =
         cat.translations.find(t => t.languageCode === lang) ||
-        cat.translations.find(t => t.languageCode === 'hi') ||
-        cat.translations[0];
+        cat.translations.find(t => t.languageCode === 'en') ||
+        cat.translations.find(t => t.languageCode === 'hi');
 
       return {
         id: cat.id,
         slug: cat.slug,
-        lang: translation?.languageCode,
-        name: translation?.name,
-        description: translation?.description,
+        lang: translation?.languageCode ?? null,
+        name: translation?.name ?? null,
+        description: translation?.description ?? null,
       };
     });
 
