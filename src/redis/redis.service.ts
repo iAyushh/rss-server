@@ -2,27 +2,27 @@ import { Redis } from 'ioredis';
 import {
   Injectable,
   OnApplicationShutdown,
-  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '@Common';
 
 @Injectable()
-export class RedisService implements OnModuleInit, OnApplicationShutdown {
+export class RedisService implements OnApplicationShutdown {
   private client: Redis;
 
   constructor(
     private readonly configService: ConfigService<EnvironmentVariables, true>,
-  ) {}
-
-  async onModuleInit() {
+  ) {
     this.client = new Redis(this.configService.get('REDIS_URI'), {
-      lazyConnect: true,
+      lazyConnect: false,
+      maxRetriesPerRequest: null,
 
-     
-      maxRetriesPerRequest: 1,
 
-     
+      retryStrategy: (times) => {
+        if (times > 3) return null; // stop retrying after 3 attempts
+        return Math.min(times * 200, 2000);
+      },
+
       enableReadyCheck: false,
     });
 
@@ -33,14 +33,9 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     this.client.on('connect', () => {
       console.log(' Redis connected');
     });
-
-    await this.client.connect();
   }
 
   getClient(): Redis {
-    if (!this.client) {
-      throw new Error('Redis client not initialized');
-    }
     return this.client;
   }
 
