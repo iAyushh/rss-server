@@ -189,6 +189,8 @@ model Subcategory {
   id           Int                      @id @default(autoincrement())
   slug         String
   categoryId   Int                      @map("category_id")
+  level        Int                      @default(0)
+  parentId     Int?                     @map("parent_id")
   createdAt    DateTime                 @default(now()) @map("created_at")
   updatedAt    DateTime                 @updatedAt @map("updated_at")
   category     Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -255,7 +257,6 @@ model ContentType {
   files        FileAsset[]
   metadata     ContentMetadata[]
 
-  // Full Text Search column
   searchVector Unsupported("tsvector")? @map("search_vector")
 
   @@unique([slug, contentYear])
@@ -290,11 +291,11 @@ model FileAsset {
   fileType    FileType
   contentYear Int?     @map("content_year")
 
-   url String? 
+  url String?
 
   uploadedAt DateTime @default(now()) @map("uploaded_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
 
   contentTypeId Int         @map("content_type_id")

@@ -11,7 +11,6 @@ import {
   CreateSubcategoryRequestDto,
   UpdateSubcategoryRequestDto,
 } from './dto';
-import slugify from 'slugify';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { nanoid } from 'nanoid';
 import { generateSlug } from '@Common';
@@ -24,9 +23,11 @@ export class SubcategoriesService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) { }
 
-  private async invalidateCache(categoryId: number) {
-    await this.cache.del(`subcategories:${categoryId}:hi`);
-    await this.cache.del(`subcategories:${categoryId}:en`);
+  private async invalidateCache() {
+    const version =
+      (await this.cache.get<number>('subcategories:version')) || 1;
+
+    await this.cache.set('subcategories:version', version + 1, 0);
   }
 
   async create(dto: CreateSubcategoryRequestDto, lang: string) {
@@ -44,7 +45,6 @@ export class SubcategoriesService {
     const slugSource = english?.name?.trim();
 
     let slug: string;
-
 
     if (slugSource) {
       slug = generateSlug(slugSource);
@@ -74,11 +74,7 @@ export class SubcategoriesService {
           );
         }
       }
-
-    }
-
-
-    else {
+    } else {
       slug = `subcategory-${nanoid(5)}`;
     }
 
@@ -86,6 +82,7 @@ export class SubcategoriesService {
       data: {
         slug,
         categoryId: dto.categoryId,
+        ...(dto.parentId ? {parentId: dto.parentId} : undefined),
         translations: {
           create: dto.translations,
         },
@@ -107,21 +104,163 @@ SET search_vector =
 WHERE s.id = ${subcategory.id};
 `;
 
-    await this.invalidateCache(dto.categoryId);
+    await this.invalidateCache();
     return subcategory;
   }
 
-  async findByCategory(categoryId: number, lang: string, skip = 0, take = 10) {
-    const cacheKey = `subcategories:${categoryId}:${lang}`;
 
-    const cached = await this.cache.get(cacheKey);
+  async getSubcategory(
+  id: number,
+  lang = 'hi',
+) {
+  const version =
+    (await this.cache.get<number>('subcategories:version')) || 1;
+
+  const cacheKey = `subcategory:${version}:${id}:${lang}`;
+
+  const cached = await this.cache.get<any>(cacheKey);
+  if (cached) return cached;
+
+  const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
+
+  const subcategory = await this.prisma.subcategory.findUnique({
+    where: { id },
+    include: {
+      translations: {
+        where: {
+          languageCode: {
+            in: languages,
+          },
+        },
+      },
+    },
+  });
+
+  if (!subcategory) {
+    throw new NotFoundException(
+      this.i18n.t('common.errors.SUBCATEGORY_NOT_FOUND', { lang }),
+    );
+  }
+
+  const translation =
+    subcategory.translations.find((t) => t.languageCode === lang) ??
+    subcategory.translations.find((t) => t.languageCode === 'hi') ??
+    subcategory.translations.find((t) => t.languageCode === 'en') ??
+    subcategory.translations[0];
+
+  const result = {
+    id: subcategory.id,
+    slug: subcategory.slug,
+    categoryId: subcategory.categoryId,
+    parent: subcategory.parentId,
+    lang: translation?.languageCode || lang,
+    name: translation?.name || '',
+    description: translation?.description || null,
+    createdAt: subcategory.createdAt,
+  };
+
+  await this.cache.set(cacheKey, result, 600);
+
+  return result;
+}
+
+  async getChildren(
+  subcategoryId: number,
+  lang = 'hi',
+  skip = 0,
+  take = 10,
+) {
+  const version =
+    (await this.cache.get<number>('subcategories:version')) || 1;
+
+  const cacheKey = `subcategories:${version}:only:${subcategoryId}:${lang}:${skip}:${take}`;
+
+  const cached = await this.cache.get<{ result: any[]; total: number }>(cacheKey);
+  if (cached) return cached;
+
+  const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
+
+  const [subcategories, total] = await Promise.all([
+    this.prisma.subcategory.findMany({
+      where: {
+        parentId: subcategoryId,
+      },
+      include: {
+        translations: {
+          where: {
+            languageCode: {
+              in: languages,
+            },
+          },
+        },
+      },
+      orderBy: [
+        { createdAt: 'asc' },
+        { id: 'asc' },
+      ],
+      skip,
+      take,
+    }),
+    this.prisma.subcategory.count({
+      where: {
+        parentId: subcategoryId,
+      },
+    }),
+  ]);
+
+  const result = subcategories.map((sub) => {
+    const translation =
+      sub.translations.find((t) => t.languageCode === lang) ??
+      sub.translations.find((t) => t.languageCode === 'hi') ??
+      sub.translations.find((t) => t.languageCode === 'en') ??
+      sub.translations[0];
+
+    return {
+      id: sub.id,
+      slug: sub.slug,
+      categoryId: sub.categoryId,
+      parent: sub.parentId,
+      lang: translation?.languageCode || lang,
+      name: translation?.name || '',
+      description: translation?.description || null,
+    };
+  });
+
+  const finalResult = { result, total };
+
+  await this.cache.set(cacheKey, finalResult, 600);
+
+  return finalResult;
+}
+
+
+
+  async findByCategory(categoryId: number, subcategoryId?: number, lang = 'hi', skip = 0, take = 10) {
+    const version =
+      (await this.cache.get<number>('subcategories:version')) || 1;
+
+    const cacheKey = `subcategories:${version}:${categoryId}:${lang}:${skip}:${take}`;
+
+    const cached = await this.cache.get<{ result: any[]; total: number }>(cacheKey);
     if (cached) return cached;
 
+    const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
     const [subcategories, total] = await Promise.all([
       this.prisma.subcategory.findMany({
-        where: { categoryId },
-        include: { translations: true },
-        orderBy: { createdAt: 'asc' },
+        where: { categoryId, level: 0, parentId: subcategoryId ? subcategoryId : undefined },
+        include: {
+          translations: {
+            where: {
+              languageCode: {
+                in: languages,
+              },
+            },
+          },
+        },
+        orderBy: [
+          { createdAt: 'asc' },
+          { id: 'asc' },
+        ],
         skip,
         take,
       }),
@@ -131,31 +270,27 @@ WHERE s.id = ${subcategory.id};
     ]);
 
     const result = subcategories.map((sub) => {
-      let translation = sub.translations.find(
-        (t: SubcategoryTranslation) => t.languageCode === lang,
-      );
-
-      if (!translation && lang !== 'hi') {
-        translation = sub.translations.find(
-          (t: SubcategoryTranslation) => t.languageCode === 'hi',
-        );
-      }
-
-      if (!translation) {
-        translation = sub.translations[0];
-      }
+      let translation =
+        sub.translations.find((t) => t.languageCode === lang) ??
+        sub.translations.find((t) => t.languageCode === 'hi') ??
+        sub.translations.find((t) => t.languageCode === 'en') ??
+        sub.translations[0];
 
       return {
         id: sub.id,
         slug: sub.slug,
         categoryId: sub.categoryId,
-        lang: translation.languageCode,
-        name: translation.name,
-        description: translation.description,
+        lang: translation?.languageCode || lang,
+        name: translation?.name || '',
+        description: translation?.description || null,
       };
     });
-    await this.cache.set(cacheKey, result, 600);
-    return { result, total };
+
+    const finalResult = { result, total };
+
+    await this.cache.set(cacheKey, finalResult, 600);
+
+    return finalResult;
   }
 
   async update(id: number, dto: UpdateSubcategoryRequestDto, lang: string) {
@@ -197,37 +332,35 @@ WHERE s.id = ${subcategory.id};
         );
       });
     }
-    const newEnglish = dto.translations?.find(
-  (t) => t.languageCode === 'en',
-);
+    const newEnglish = dto.translations?.find((t) => t.languageCode === 'en');
 
-if (newEnglish?.name?.trim()) {
-  const newSlugBase = generateSlug(newEnglish.name);
+    if (newEnglish?.name?.trim()) {
+      const newSlugBase = generateSlug(newEnglish.name);
 
-  if (newSlugBase) {
-    let slug = newSlugBase;
-    let counter = 0;
+      if (newSlugBase) {
+        let slug = newSlugBase;
+        let counter = 0;
 
-    while (true) {
-      const exists = await this.prisma.subcategory.findFirst({
-        where: {
-          slug,
-          NOT: { id }, 
-        },
-      });
+        while (true) {
+          const exists = await this.prisma.subcategory.findFirst({
+            where: {
+              slug,
+              NOT: { id },
+            },
+          });
 
-      if (!exists) break;
+          if (!exists) break;
 
-      counter++;
-      slug = `${newSlugBase}-${counter}`; 
+          counter++;
+          slug = `${newSlugBase}-${counter}`;
+        }
+
+        await this.prisma.subcategory.update({
+          where: { id },
+          data: { slug },
+        });
+      }
     }
-
-    await this.prisma.subcategory.update({
-      where: { id },
-      data: { slug },
-    });
-  }
-}
     await this.prisma.$executeRaw`
 UPDATE subcategory s
 SET search_vector =
@@ -243,13 +376,12 @@ SET search_vector =
 WHERE s.id = ${id};
 `;
 
-    await this.invalidateCache(subcategory.categoryId);
+    await this.invalidateCache();
 
     return {
       message: this.i18n.t('common.success.SUBCATEGORY_UPDATED', { lang }),
     };
   }
-
 
   async remove(id: number, lang: string) {
     const subcategory = await this.prisma.subcategory.findUnique({
@@ -266,7 +398,7 @@ WHERE s.id = ${id};
       where: { id },
     });
 
-    await this.invalidateCache(subcategory.categoryId);
+    await this.invalidateCache();
 
     return {
       message: this.i18n.t('common.success.SUBCATEGORY_DELETED', { lang }),

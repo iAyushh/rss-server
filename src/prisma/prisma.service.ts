@@ -1,9 +1,11 @@
 import {
   Injectable,
-  OnApplicationShutdown,
   OnModuleInit,
+  OnApplicationShutdown,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+
+let prisma: PrismaClient;
 
 @Injectable()
 export class PrismaService
@@ -11,9 +13,14 @@ export class PrismaService
   implements OnModuleInit, OnApplicationShutdown
 {
   constructor() {
-    super({
-      errorFormat: 'minimal',
-    });
+    if (!prisma) {
+      prisma = new PrismaClient({
+        errorFormat: 'minimal',
+      });
+    }
+
+    super();
+    Object.assign(this, prisma);
   }
 
   async onModuleInit() {

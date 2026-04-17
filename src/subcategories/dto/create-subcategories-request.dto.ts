@@ -8,6 +8,10 @@ export class CreateSubcategoryRequestDto {
   @IsInt()
   categoryId!: number;
 
+  @ApiProperty()
+  @IsInt()
+  parentId!: number;
+
   @ApiProperty({ type: [SubcategoryTranslationDto] })
   @IsArray()
   @ValidateNested({ each: true })

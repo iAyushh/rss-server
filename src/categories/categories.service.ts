@@ -6,9 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { I18nService } from 'nestjs-i18n';
-import { CategoryTranslation } from '@prisma/client';
+import { CategoryTranslation, Prisma } from '@prisma/client';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
-import slugify from 'slugify';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { generateSlug } from '@Common';
 import { nanoid } from 'nanoid';
@@ -22,20 +21,19 @@ export class CategoryService {
   ) { }
 
   private async invalidateCache() {
-    await this.cache.del('categories:hi');
-    await this.cache.del('categories:en');
+    const currentVersion =
+      (await this.cache.get<number>('categories:version')) ?? 1;
+
+    await this.cache.set('categories:version', currentVersion + 1, 0);
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
-
     const english = dto.translations.find((t) => t.languageCode === 'en');
     // const hindi = dto.translations.find((t) => t.languageCode === 'hi');
-
 
     const slugSource = english?.name?.trim();
 
     let slug: string;
-
 
     if (slugSource) {
       slug = generateSlug(slugSource);
@@ -65,28 +63,21 @@ export class CategoryService {
           );
         }
       }
-
-    }
-
-
-    else {
+    } else {
       slug = `category-${nanoid(5)}`;
     }
     try {
-
       const category = await this.prisma.category.create({
         data: {
           slug,
           translations: {
-            create: dto.translations.map((t)=>({
+            create: dto.translations.map((t) => ({
               ...t,
               name: t.name.trim().normalize('NFC'),
-            }))
+            })),
           },
         },
       });
-
-
 
       await this.prisma.$executeRaw`
     UPDATE category c
@@ -105,7 +96,6 @@ export class CategoryService {
 
       await this.invalidateCache();
       return category;
-
     } catch (error) {
       if (error.code === 'P2002') {
         throw new BadRequestException(
@@ -117,15 +107,34 @@ export class CategoryService {
   }
 
   async findAll(lang: string, skip = 0, take = 20) {
-    const cacheKey = `categories:${lang}`;
+    const version = (await this.cache.get<number>('categories:version')) || 1;
+
+    const cacheKey = `categories:${version}:${lang}:${skip}:${take}`;
 
     const cached = await this.cache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const [categories, total] = await Promise.all([
       this.prisma.category.findMany({
-        include: { translations: true },
-        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          slug: true,
+          translations: {
+            where: {
+              languageCode: {
+                in: ['en', 'hi'],
+              },
+            },
+            select: {
+              languageCode: true,
+              name: true,
+              description: true,
+            },
+          }
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         skip,
         take,
       }),
@@ -133,35 +142,195 @@ export class CategoryService {
     ]);
 
     const data = categories.map((cat) => {
-      let translation = cat.translations.find(
-        (t: CategoryTranslation) => t.languageCode === lang,
-      );
-      if (!translation && lang !== 'hi') {
-        translation = cat.translations.find(
-          (t: CategoryTranslation) => t.languageCode === 'hi',
-        );
-      }
-      if (!translation) {
-        translation = cat.translations[0];
-      }
+      const translation =
+        cat.translations.find(t => t.languageCode === lang) ||
+        cat.translations.find(t => t.languageCode === 'en') ||
+        cat.translations.find(t => t.languageCode === 'hi');
 
       return {
         id: cat.id,
         slug: cat.slug,
-        lang: translation.languageCode,
-        name: translation.name,
-        description: translation.description,
+        lang: translation?.languageCode ?? null,
+        name: translation?.name ?? null,
+        description: translation?.description ?? null,
       };
     });
+
     const result = { data, total };
+
     await this.cache.set(cacheKey, result, 600);
+
     return result;
   }
+
+
+  async getCategoryCombined(options: {
+    categoryId: number;
+    skip: number;
+    take: number;
+    lang: string;
+  }) {
+    const { categoryId, skip, take, lang } = options;
+
+
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      include: { translations: true },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const categoryName =
+      category.translations.find(t => t.languageCode === lang)?.name ||
+      category.translations[0]?.name;
+
+
+    const where: Prisma.FileAssetWhereInput = {
+      OR: [
+        {
+          metadata: {
+            some: {
+              AND: [{ key: 'categoryId' }, { value: String(categoryId) }],
+            },
+          },
+        },
+        {
+          metadata: {
+            some: {
+              AND: [
+                { key: 'category' },
+                {
+                  value: {
+                    equals: categoryName,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    };
+
+
+    const [fileCount, subcategoryCount] = await Promise.all([
+      this.prisma.fileAsset.count({ where }),
+      this.prisma.subcategory.count({ where: { categoryId } }),
+    ]);
+
+    const total = fileCount + subcategoryCount;
+
+
+    const subcategoryTake = Math.max(
+      0,
+      Math.min(subcategoryCount - skip, take),
+    );
+
+    const fileSkip = Math.max(0, skip - subcategoryCount);
+    const fileTake = take - subcategoryTake;
+
+
+    const subcategories =
+      subcategoryTake > 0
+        ? await this.prisma.subcategory.findMany({
+          where: { categoryId },
+          skip,
+          take: subcategoryTake,
+          select: {
+            id: true,
+            translations: {
+              where: { languageCode: lang },
+              select: { name: true },
+            },
+          },
+          orderBy: { id: 'asc' },
+        })
+        : [];
+
+
+    const files =
+      fileTake > 0
+        ? await this.prisma.fileAsset.findMany({
+          where,
+          skip: fileSkip,
+          take: fileTake,
+          orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
+          select: {
+            id: true,
+            fileType: true,
+            url: true,
+            fileSize: true,
+            contentYear: true,
+            uploadedAt: true,
+            originalName: true,
+
+            metadata: {
+              select: { key: true, value: true },
+            },
+
+            translations: {
+              where: { languageCode: lang },
+              select: { displayName: true },
+            },
+          },
+        })
+        : [];
+
+
+    const subcategoryMap = new Map<number, string>();
+    subcategories.forEach((s) => {
+      const name = s.translations[0]?.name;
+      if (name) subcategoryMap.set(s.id, name);
+    });
+
+
+    const combinedData = [
+      ...subcategories.map((s) => ({
+        type: 'subcategory',
+        id: s.id,
+        name: s.translations[0]?.name || null,
+      })),
+
+      ...files.map((f) => {
+        const metaMap = new Map<string, string>();
+        f.metadata.forEach((m) => metaMap.set(m.key, m.value));
+
+        const subcategoryId = Number(metaMap.get('subcategoryId'));
+
+        return {
+          type: 'file',
+          id: f.id,
+          fileType: f.fileType,
+          url: f.url,
+          fileSize: f.fileSize,
+          contentYear: f.contentYear,
+          uploadedAt: f.uploadedAt,
+
+          subcategoryId,
+          subcategory: subcategoryMap.get(subcategoryId) || null,
+
+          displayName:
+            f.translations[0]?.displayName || f.originalName,
+        };
+      }),
+    ];
+
+    return {
+      categoryId,
+      data: combinedData,
+      total,
+      skip,
+      take,
+    };
+  }
+
 
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
-      include: { translations: true }
+      include: { translations: true },
     });
 
     if (!category) {
@@ -199,9 +368,7 @@ export class CategoryService {
       );
     }
 
-    const newEnglish = dto.translations?.find(
-      (t) => t.languageCode === 'en',
-    );
+    const newEnglish = dto.translations?.find((t) => t.languageCode === 'en');
 
     if (newEnglish?.name?.trim()) {
       const newSlugBase = generateSlug(newEnglish.name);
@@ -230,7 +397,6 @@ export class CategoryService {
         });
       }
     }
-
 
     await this.prisma.$executeRaw`
   UPDATE category c
@@ -287,6 +453,7 @@ export class CategoryService {
     }
 
     await this.prisma.category.delete({ where: { id } });
+
     await this.invalidateCache();
 
     return {

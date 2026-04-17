@@ -18,6 +18,8 @@ import { ContentTypesModule } from './content-types/content-types.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { FileModule } from './file/file.module';
 import { SearchModule } from './search/search.module';
+import { redisStore } from 'cache-manager-ioredis-yet';
+import KeyvRedis from '@keyv/redis';
 
 const redisEnabled = process.env.REDIS_ENABLED === 'true';
 
@@ -33,18 +35,21 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
       resolvers: [{ use: QueryResolver, options: ['lang'] }],
     }),
 
-    MulterModule.registerAsync({
-      useFactory: (storageService: StorageService) => ({
-        ...storageService.defaultMulterOptions,
-      }),
-      inject: [StorageService],
-    }),
+    // MulterModule.registerAsync({
+    //   useFactory: (storageService: StorageService) => ({
+    //     ...storageService.defaultMulterOptions,
+    //   }),
+    //   inject: [StorageService],
+    // }),
 
     CacheModule.register({
       isGlobal: true,
-      ttl: 600,
-      max: 1000,
+      stores: process.env.REDIS_URI
+        ? [new KeyvRedis(process.env.REDIS_URI)]
+        : undefined,
+      ttl: 600 ,
     }),
+
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     CommonModule,
@@ -61,11 +66,11 @@ const redisEnabled = process.env.REDIS_ENABLED === 'true';
     SearchModule,
   ],
   controllers: [AppController],
-  providers: [
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: AppCacheInterceptor,
-    },
-  ],
+  // providers: [
+  //   {
+  //     provide: APP_INTERCEPTOR,
+  //     useClass: AppCacheInterceptor,
+  //   },
+  // ],
 })
 export class AppModule {}

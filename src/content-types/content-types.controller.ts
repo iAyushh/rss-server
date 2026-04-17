@@ -9,6 +9,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ContentTypeService } from './content-types.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
@@ -21,13 +22,14 @@ import {
   UserType,
 } from '@Common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 
 @ApiBearerAuth()
 @ApiTags('Content-Types')
 @UseGuards(JwtAuthGuard, AccessGuard)
 @Controller('content-types')
 export class ContentTypeController {
-  constructor(private readonly contentTypeService: ContentTypeService) {}
+  constructor(private readonly contentTypeService: ContentTypeService) { }
 
   @Post()
   create(@Body() dto: CreateContentTypeDto) {
@@ -41,11 +43,14 @@ export class ContentTypeController {
   @ApiQuery({ name: 'take', required: false, type: Number })
   async getAll(
     @I18nLang() lang: string,
+    @Res({ passthrough: true }) res: Response,
     @Query('categoryId') categoryId?: number,
     @Query('subcategoryId') subcategoryId?: number,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
   ) {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+
     return this.contentTypeService.findAll(
       lang,
       categoryId ? Number(categoryId) : undefined,
@@ -56,7 +61,12 @@ export class ContentTypeController {
   }
 
   @Get('index')
-  async getIndex(@Query('lang') lang = 'en') {
+  async getIndex(
+    @Query('lang') lang = 'en',
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.setHeader('Cache-Control', 'public, max-age=120, s-maxage=600');
+
     return this.contentTypeService.getIndexNavigation(lang);
   }
 
@@ -66,7 +76,10 @@ export class ContentTypeController {
     @Param('categorySlug') categorySlug: string,
     @Param('contentSlug') contentSlug: string,
     @Query('lang') lang = 'hi',
+    @Res({ passthrough: true }) res: Response,
   ) {
+    res.setHeader('Cache-Control', 'public, max-age=120, s-maxage=600');
+
     return this.contentTypeService.getContentByYearSlug(
       year,
       categorySlug,
@@ -75,6 +88,7 @@ export class ContentTypeController {
     );
   }
 
+  
   @Roles(UserType.Admin)
   @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
   @Patch(':id')

@@ -5,7 +5,9 @@
     "SUBCATEGORY_ALREADY_EXISTS": "Subcategory already exists",
     "SUBCATEGORY_NOT_FOUND": "Subcategory not found",
     "HINDI_TRANSLATION_REQUIRED": "Hindi translation is mandatory",
-    "CATEGORY_HAS_SUBCATEGORIES": "This category contains subcategories. Please delete them first."
+    "CATEGORY_HAS_SUBCATEGORIES": "This category contains subcategories. Please delete them first.",
+    "CONTENT_TYPE_NOT_FOUND": "Content type not found",
+    "FILE_NOT_FOUND": "File not found"
   },
   "success": {
     "CATEGORY_CREATED": "Category created successfully",

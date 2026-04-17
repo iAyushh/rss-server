@@ -8,7 +8,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateContentTypeDto, UpdateContentTypeDto } from './dto';
 import { I18nService } from 'nestjs-i18n';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import slugify from 'slugify';
 import { nanoid } from 'nanoid';
 import { generateSlug } from '@Common';
 
@@ -21,12 +20,13 @@ export class ContentTypeService {
   ) { }
 
   private async invalidateCache() {
-    await this.cache.del('content-types:hi');
-    await this.cache.del('content-types:en');
+    const version =
+      (await this.cache.get<number>('content-types:version')) || 1;
+
+    await this.cache.set('content-types:version', version + 1, 0);
   }
 
   async create(dto: CreateContentTypeDto) {
-
     const category = await this.prisma.category.findUnique({
       where: { id: dto.categoryId },
     });
@@ -34,7 +34,6 @@ export class ContentTypeService {
     if (!category) {
       throw new BadRequestException('Invalid categoryId');
     }
-
 
     if (dto.subcategoryId) {
       const sub = await this.prisma.subcategory.findUnique({
@@ -48,11 +47,8 @@ export class ContentTypeService {
       }
     }
 
-
     const content = await this.prisma.$transaction(async (tx) => {
-      const english = dto.translations?.find(
-        (t) => t.languageCode === 'en',
-      );
+      const english = dto.translations?.find((t) => t.languageCode === 'en');
 
       const slugSource = english?.name?.trim();
 
@@ -125,10 +121,15 @@ WHERE ct.id = ${content.id};
     skip = 0,
     take = 10,
   ) {
-    const cacheKey = `content-types:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}`;
+    const version =
+      (await this.cache.get<number>('content-types:version')) || 1;
 
-    const cached = await this.cache.get(cacheKey);
+    const cacheKey = `content-types:${version}:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}:${skip}:${take}`;
+
+    const cached = await this.cache.get<{ data: any[]; total: number }>(cacheKey);
     if (cached) return cached;
+
+    const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
 
     const [contents, total] = await Promise.all([
       this.prisma.contentType.findMany({
@@ -137,11 +138,21 @@ WHERE ct.id = ${content.id};
           subcategoryId: subcategoryId ?? undefined,
         },
         include: {
-          translations: true,
+          translations: {
+            where: {
+              languageCode: {
+                in: languages,
+              },
+            },
+          },
           category: { select: { id: true, slug: true } },
           subcategory: { select: { id: true, slug: true } },
         },
-        orderBy: [{ contentYear: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [
+          { contentYear: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'desc' },
+        ],
         skip,
         take,
       }),
@@ -152,31 +163,32 @@ WHERE ct.id = ${content.id};
         },
       }),
     ]);
-    const result = contents
-      .filter((content) => content.translations.length > 0)
-      .map((content) => {
-        const translation =
-          content.translations.find((t) => t.languageCode === lang) ??
-          (lang !== 'hi'
-            ? content.translations.find((t) => t.languageCode === 'hi')
-            : null) ??
-          content.translations[0];
 
-        return {
-          id: content.id,
-          categoryId: content.categoryId,
-          subcategoryId: content.subcategoryId,
-          categorySlug: content.category.slug,
-          subcategorySlug: content.subcategory?.slug ?? null,
-          contentYear: content.contentYear,
-          lang: translation.languageCode,
-          name: translation.name,
-          description: translation.description,
-          createdAt: content.createdAt,
-        };
-      });
-    await this.cache.set(cacheKey, result, 300);
-    return { data: result, total };
+    const result = contents.map((content) => {
+      let translation =
+        content.translations.find(t => t.languageCode === lang)
+        ?? content.translations.find(t => t.languageCode === 'hi')
+        ?? content.translations.find(t => t.languageCode === 'en')
+        ?? content.translations[0];
+      return {
+        id: content.id,
+        categoryId: content.categoryId,
+        subcategoryId: content.subcategoryId,
+        categorySlug: content.category.slug,
+        subcategorySlug: content.subcategory?.slug ?? null,
+        contentYear: content.contentYear,
+        lang: translation?.languageCode || lang,
+        name: translation?.name || '',
+        description: translation?.description || null,
+        createdAt: content.createdAt,
+      };
+    });
+
+    const finalResult = { data: result, total };
+
+    await this.cache.set(cacheKey, finalResult, 300);
+
+    return finalResult;
   }
 
   async getContentByYearSlug(
@@ -185,12 +197,20 @@ WHERE ct.id = ${content.id};
     contentSlug: string,
     lang: string,
   ) {
+    const version =
+      (await this.cache.get<number>('content-types:version')) || 1;
+
+    const cacheKey = `content-types:detail:${version}:${year}:${categorySlug}:${contentSlug}:${lang}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const content = await this.prisma.contentType.findFirst({
       where: {
         slug: contentSlug,
-        contentYear: year,
-        category: {
-          slug: categorySlug,
+        category: { slug: categorySlug },
+        files: {
+          some: { contentYear: year },
         },
       },
       include: {
@@ -198,6 +218,7 @@ WHERE ct.id = ${content.id};
         category: true,
         subcategory: true,
         files: {
+          where: { contentYear: year },
           include: {
             translations: true,
             metadata: true,
@@ -213,19 +234,17 @@ WHERE ct.id = ${content.id};
 
     const translation =
       content.translations.find((t) => t.languageCode === lang) ??
-      (lang !== 'hi'
-        ? content.translations.find((t) => t.languageCode === 'hi')
-        : null) ??
+      content.translations.find((t) => t.languageCode === 'hi') ??
       content.translations[0];
 
-    return {
+    const result = {
       id: content.id,
       slug: content.slug,
       contentYear: content.contentYear,
       categorySlug: content.category.slug,
       subcategorySlug: content.subcategory?.slug ?? null,
-      name: translation.name,
-      description: translation.description,
+      name: translation?.name || '',
+      description: translation?.description || null,
       files: content.files.map((f) => ({
         id: f.id,
         url: `${process.env.APP_URL}/uploads/${f.storageKey}`,
@@ -238,9 +257,21 @@ WHERE ct.id = ${content.id};
           f.originalName,
       })),
     };
+
+    await this.cache.set(cacheKey, result, 600);
+
+    return result;
   }
 
   async getIndexNavigation(lang: string) {
+    const version =
+      (await this.cache.get<number>('content-types:version')) || 1;
+
+    const cacheKey = `content-types:index:${version}:${lang}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const contents = await this.prisma.contentType.findMany({
       include: {
         translations: true,
@@ -320,7 +351,7 @@ WHERE ct.id = ${content.id};
       }
     }
 
-    return Object.values(result).map((yearBlock: any) => ({
+    const finalResult = Object.values(result).map((yearBlock: any) => ({
       year: yearBlock.year,
       categories: Object.values(yearBlock.categories).map((cat: any) => ({
         slug: cat.slug,
@@ -328,8 +359,11 @@ WHERE ct.id = ${content.id};
         subcategories: Object.values(cat.subcategories),
       })),
     }));
-  }
 
+    await this.cache.set(cacheKey, finalResult, 600);
+
+    return finalResult;
+  }
 
   async update(id: number, dto: UpdateContentTypeDto, lang: string) {
     const exists = await this.prisma.contentType.findUnique({
@@ -343,7 +377,6 @@ WHERE ct.id = ${content.id};
     }
 
     await this.prisma.$transaction(async (tx) => {
-
       await tx.contentType.update({
         where: { id },
         data: {
@@ -377,9 +410,7 @@ WHERE ct.id = ${content.id};
       }
     });
 
-    const newEnglish = dto.translations?.find(
-      (t) => t.languageCode === 'en',
-    );
+    const newEnglish = dto.translations?.find((t) => t.languageCode === 'en');
 
     if (newEnglish?.name?.trim()) {
       const newSlugBase = generateSlug(newEnglish.name);
@@ -429,7 +460,6 @@ WHERE ct.id = ${id};
       message: this.i18n.t('common.success.CONTENT_UPDATED', { lang }),
     };
   }
-
 
   async remove(id: number) {
     const content = await this.prisma.contentType.findUnique({

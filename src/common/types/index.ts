@@ -12,6 +12,13 @@ export enum Environment {
   Test = 'test',
 }
 
+export enum FileCategory {
+  MEDIA = 'media',
+  DOCS = 'docs',
+  REPORTS = 'reports',
+  OTHERS = 'others',
+}
+
 export class EnvironmentVariables {
   @IsEnum(NodeType)
   NODE_TYPE: NodeType;
@@ -41,8 +48,8 @@ export class EnvironmentVariables {
   @IsString()
   REDIS_ENABLED?: string;
 
-  @IsString()
-  STORAGE_DIR: string;
+  // @IsString()
+  // STORAGE_DIR: string;
 }
 
 /**

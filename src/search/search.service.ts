@@ -1,10 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Cache } from 'cache-manager';
 import { PrismaService } from 'src/prisma';
 
+type FileWithRelations = Prisma.FileAssetGetPayload<{
+  select: {
+    id: true;
+    originalName: true;
+    fileType: true;
+    fileSize: true;
+    url: true;
+    contentYear: true;
+    createdAt: true;
+    translations: true;
+    contentType: {
+      select: {
+        translations: true;
+        category: { select: { translations: true } };
+        subcategory: { select: { translations: true } };
+      };
+    };
+  };
+}>;
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
+  ) { }
 
   private parseSearchQuery(query: string) {
     const tokens = query.trim().split(/\s+/);
@@ -33,6 +56,16 @@ export class SearchService {
     take = 20,
     year?: number,
   ) {
+
+
+
+    const normalizedQuery = (query || '').trim().toLowerCase();
+
+    const cacheKey = `search:global:${normalizedQuery}:${languageCode}:${skip}:${take}:${year ?? 'all'}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     if ((!query || !query.trim()) && !year) {
       return [];
     }
@@ -54,7 +87,7 @@ export class SearchService {
       return [];
     }
 
-    return this.prisma.$queryRaw(
+    const result = await this.prisma.$queryRaw(
       Prisma.sql`
 
 SELECT * FROM (
@@ -118,7 +151,7 @@ SELECT
   'content' AS type,
   ct.id,
   ct.slug,
-  ct.content_year AS year,
+  NULL::int AS year, 
   (
     SELECT name
     FROM content_type_translation
@@ -137,7 +170,12 @@ FROM content_type ct
 WHERE
 (
   (${yearLike})::text IS NULL
-  OR ct.content_year::text LIKE ${yearLike}
+  OR EXISTS (
+    SELECT 1
+    FROM file_asset f2
+    WHERE f2.content_type_id = ct.id
+    AND f2.content_year::text LIKE ${yearLike}
+  )
 )
 AND (
   (${searchTerm})::text IS NULL
@@ -183,8 +221,11 @@ ORDER BY year DESC NULLS LAST, rank DESC
 LIMIT ${take} OFFSET ${skip}
 `,
     );
-  }
 
+    await this.cache.set(cacheKey, result, 300);
+
+    return result;
+  }
 
   async searchFiles(
     search?: string,
@@ -192,124 +233,121 @@ LIMIT ${take} OFFSET ${skip}
     skip = 0,
     take = 20,
     year?: number,
+    sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name',
+    order?: 'asc' | 'desc',
   ) {
 
+
+    const normalizedQuery = (search || '').trim().toLowerCase();
+
+    const cacheKey = `search:files:${normalizedQuery}:${languageCode}:${skip}:${take}:${year ?? 'all'}:${sortBy ?? 'none'}:${order ?? 'desc'}`;
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const lang = languageCode || 'hi';
-    let files = await this.prisma.fileAsset.findMany({
-      where: {
-        ...(year && { contentYear: year }),
 
-        ...(search && {
-          translations: {
-            some: {
-              displayName: {
-                contains: search,
-                mode: 'insensitive',
-              },
-              languageCode: lang,
-            },
-          },
-        }),
-      },
+    const sortFieldMap = {
+      updatedAt: 'createdAt',
+      fileSize: 'fileSize',
+      originalName: 'originalName',
+    } as const;
 
+    const isStringSort = sortBy === 'originalName' || sortBy === 'name';
 
-      select: {
-        id: true,
-        originalName: true,
-        fileType: true,
-        fileSize: true,
-        url: true,
-        contentYear: true,
-        createdAt: true,
+    const orderBy: Prisma.FileAssetOrderByWithRelationInput =
+      sortBy && !isStringSort
+        ? { [sortFieldMap[sortBy]]: (order ?? 'desc') as Prisma.SortOrder }
+        : { createdAt: 'desc' };
 
-        translations: true,
-
-        contentType: {
-          select: {
-            translations: true,
-            category: {
-              select: { translations: true },
-            },
-            subcategory: {
-              select: { translations: true },
-            },
-          },
+    const select = {
+      id: true,
+      originalName: true,
+      fileType: true,
+      fileSize: true,
+      url: true,
+      contentYear: true,
+      createdAt: true,
+      translations: true,
+      contentType: {
+        select: {
+          translations: true,
+          category: { select: { translations: true } },
+          subcategory: { select: { translations: true } },
         },
       },
+    };
 
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
+    const baseWhere: Prisma.FileAssetWhereInput = {
+      ...(year && { contentYear: year }),
+      ...(search && {
+        translations: {
+          some: {
+            displayName: {
+              contains: search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+            languageCode: lang,
+          },
+        },
+      }),
+    };
+
+    const total = await this.prisma.fileAsset.count({
+      where: baseWhere,
     });
 
+    let files: FileWithRelations[] = await this.prisma.fileAsset.findMany({
+      where: baseWhere,
+      select,
+      orderBy: isStringSort ? undefined : orderBy,
+      skip: isStringSort ? 0 : skip,
+      take: isStringSort ? 5000 : take,
+    });
 
     if (search && files.length === 0) {
+      const fallbackWhere: Prisma.FileAssetWhereInput = {
+        ...(year && { contentYear: year }),
+        translations: {
+          some: {
+            displayName: {
+              contains: search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+        },
+      };
+
       files = await this.prisma.fileAsset.findMany({
-        where: {
-          ...(year && { contentYear: year }),
-
-          translations: {
-            some: {
-              displayName: {
-                contains: search,
-                mode: 'insensitive',
-              },
-            },
-          },
-        },
-
-        select: {
-          id: true,
-          originalName: true,
-          fileType: true,
-          fileSize: true,
-          url: true,
-          contentYear: true,
-          createdAt: true,
-
-          translations: true,
-
-          contentType: {
-            select: {
-              translations: true,
-              category: {
-                select: { translations: true },
-              },
-              subcategory: {
-                select: { translations: true },
-              },
-            },
-          },
-        },
-
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take,
+        where: fallbackWhere,
+        select,
+        orderBy: isStringSort ? undefined : orderBy,
+        skip: isStringSort ? 0 : skip,
+        take: isStringSort ? 5000 : take,
       });
     }
-
 
     const pick = (arr: any[]) =>
       arr.find((t) => t.languageCode === lang) ||
       arr.find((t) => t.languageCode === 'en') ||
       arr[0];
 
-    return files.map((file) => {
+    const mappedFiles = files.map((file) => {
       const fileTranslation = pick(file.translations);
 
       const contentTypeTranslation = file.contentType?.translations?.length
         ? pick(file.contentType.translations)
         : null;
 
-      const categoryTranslation =
-        file.contentType?.category?.translations?.length
-          ? pick(file.contentType.category.translations)
-          : null;
+      const categoryTranslation = file.contentType?.category?.translations
+        ?.length
+        ? pick(file.contentType.category.translations)
+        : null;
 
-      const subcategoryTranslation =
-        file.contentType?.subcategory?.translations?.length
-          ? pick(file.contentType.subcategory.translations)
-          : null;
+      const subcategoryTranslation = file.contentType?.subcategory?.translations
+        ?.length
+        ? pick(file.contentType.subcategory.translations)
+        : null;
 
       return {
         id: file.id,
@@ -320,12 +358,45 @@ LIMIT ${take} OFFSET ${skip}
         url: file.url,
         year: file.contentYear,
         createdAt: file.createdAt,
-
-
         contentType: contentTypeTranslation?.name || null,
         category: categoryTranslation?.name || null,
         subcategory: subcategoryTranslation?.name || null,
       };
     });
+
+    const sortFn = (a: string, b: string) =>
+      a.localeCompare(b, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+
+    if (sortBy === 'originalName') {
+      mappedFiles.sort((a, b) =>
+        order === 'asc'
+          ? sortFn(a.originalName || '', b.originalName || '')
+          : sortFn(b.originalName || '', a.originalName || ''),
+      );
+    }
+
+    if (sortBy === 'name') {
+      mappedFiles.sort((a, b) =>
+        order === 'asc'
+          ? sortFn(a.name || '', b.name || '')
+          : sortFn(b.name || '', a.name || ''),
+      );
+    }
+
+    const finalFiles = isStringSort
+      ? mappedFiles.slice(skip, skip + take)
+      : mappedFiles;
+
+    const finalResult = {
+      files: finalFiles,
+      total,
+    };
+
+    await this.cache.set(cacheKey, finalResult, 300);
+
+    return finalResult;
   }
 }

@@ -5,7 +5,9 @@
     "SUBCATEGORY_ALREADY_EXISTS": "उप-श्रेणी पहले से मौजूद है",
     "SUBCATEGORY_NOT_FOUND": "उप-श्रेणी नहीं मिली",
     "CATEGORY_HAS_SUBCATEGORIES": "इस श्रेणी में उप-श्रेणियाँ मौजूद हैं। पहले उन्हें हटाएँ।",
-    "INVALID_FILE_TYPE": "अमान्य फ़ाइल प्रकार."
+    "INVALID_FILE_TYPE": "अमान्य फ़ाइल प्रकार.",
+    "FILE_NOT_FOUND": "फ़ाइल नहीं मिली",
+    "CONTENT_TYPE_NOT_FOUND": "सामग्री प्रकार नहीं मिला"
   },
   "success": {
     "CATEGORY_CREATED": "श्रेणी सफलतापूर्वक बनाई गई",

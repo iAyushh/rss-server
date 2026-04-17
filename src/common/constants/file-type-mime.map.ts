@@ -10,9 +10,7 @@ export const FILE_TYPE_MIME_MAP: Record<FileType, string[]> = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ],
 
-  CSV: ['text/csv',
-    'application/csv',
-    'application/vnd.ms-excel',],
+  CSV: ['text/csv', 'application/csv', 'application/vnd.ms-excel'],
 
   EXCEL: [
     'application/vnd.ms-excel',
@@ -41,7 +39,7 @@ export const FILE_TYPE_MIME_MAP: Record<FileType, string[]> = {
     'video/quicktime', // mov
     'video/x-msvideo', // avi
     'video/x-matroska', // mkv
-    'video/3gpp',  // 3gp
+    'video/3gpp', // 3gp
   ],
 
   OTHER: [], // fallback (no validation)

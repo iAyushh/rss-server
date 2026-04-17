@@ -30,4 +30,14 @@ export class SearchablePaginatedDto {
   @Type(() => Number)
   @IsNumber()
   year?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  order?: 'asc' | 'desc';
 }

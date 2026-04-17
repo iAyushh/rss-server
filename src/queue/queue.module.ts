@@ -1,28 +1,38 @@
-import { Redis } from 'ioredis';
 import { BullModule } from '@nestjs/bullmq';
-import { DynamicModule, Module } from '@nestjs/common';
+import { DynamicModule } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '@Common';
+import { RedisService } from 'src/redis';
+import { RedisModule } from 'src/redis/redis.module';
 
-@Module({})
 export class QueueModule {
   static registerAsync(name: string): DynamicModule {
     return BullModule.registerQueueAsync({
       name,
+      imports: [RedisModule],
+
+      inject: [ConfigService, RedisService],
+
       useFactory: (
-        configService: ConfigService<EnvironmentVariables, true>,
-      ) => ({
-        connection: new Redis(configService.get('REDIS_URI'), {
-          maxRetriesPerRequest: null,
-        }),
-        defaultJobOptions: {
-          removeOnComplete: true,
-          removeOnFail: {
-            age: 86400, // 24 hr
-          },
-        },
-      }),
-      inject: [ConfigService],
+  configService: ConfigService<EnvironmentVariables, true>,
+  redisService: RedisService,
+) => {
+  return {
+    connection: redisService.getClient(),
+
+    defaultJobOptions: {
+      removeOnComplete: true,
+      removeOnFail: {
+        age: 86400,
+      },
+      attempts: 2,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+    },
+  };
+},
     });
   }
 }
