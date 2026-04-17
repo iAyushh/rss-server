@@ -82,6 +82,7 @@ export class SubcategoriesService {
       data: {
         slug,
         categoryId: dto.categoryId,
+        ...(dto.parentId ? {parentId: dto.parentId} : undefined),
         translations: {
           create: dto.translations,
         },
@@ -107,7 +108,134 @@ WHERE s.id = ${subcategory.id};
     return subcategory;
   }
 
-  async findByCategory(categoryId: number, lang: string, skip = 0, take = 10) {
+
+  async getSubcategory(
+  id: number,
+  lang = 'hi',
+) {
+  const version =
+    (await this.cache.get<number>('subcategories:version')) || 1;
+
+  const cacheKey = `subcategory:${version}:${id}:${lang}`;
+
+  const cached = await this.cache.get<any>(cacheKey);
+  if (cached) return cached;
+
+  const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
+
+  const subcategory = await this.prisma.subcategory.findUnique({
+    where: { id },
+    include: {
+      translations: {
+        where: {
+          languageCode: {
+            in: languages,
+          },
+        },
+      },
+    },
+  });
+
+  if (!subcategory) {
+    throw new NotFoundException(
+      this.i18n.t('common.errors.SUBCATEGORY_NOT_FOUND', { lang }),
+    );
+  }
+
+  const translation =
+    subcategory.translations.find((t) => t.languageCode === lang) ??
+    subcategory.translations.find((t) => t.languageCode === 'hi') ??
+    subcategory.translations.find((t) => t.languageCode === 'en') ??
+    subcategory.translations[0];
+
+  const result = {
+    id: subcategory.id,
+    slug: subcategory.slug,
+    categoryId: subcategory.categoryId,
+    parent: subcategory.parentId,
+    lang: translation?.languageCode || lang,
+    name: translation?.name || '',
+    description: translation?.description || null,
+    createdAt: subcategory.createdAt,
+  };
+
+  await this.cache.set(cacheKey, result, 600);
+
+  return result;
+}
+
+  async getChildren(
+  subcategoryId: number,
+  lang = 'hi',
+  skip = 0,
+  take = 10,
+) {
+  const version =
+    (await this.cache.get<number>('subcategories:version')) || 1;
+
+  const cacheKey = `subcategories:${version}:only:${subcategoryId}:${lang}:${skip}:${take}`;
+
+  const cached = await this.cache.get<{ result: any[]; total: number }>(cacheKey);
+  if (cached) return cached;
+
+  const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
+
+  const [subcategories, total] = await Promise.all([
+    this.prisma.subcategory.findMany({
+      where: {
+        parentId: subcategoryId,
+      },
+      include: {
+        translations: {
+          where: {
+            languageCode: {
+              in: languages,
+            },
+          },
+        },
+      },
+      orderBy: [
+        { createdAt: 'asc' },
+        { id: 'asc' },
+      ],
+      skip,
+      take,
+    }),
+    this.prisma.subcategory.count({
+      where: {
+        parentId: subcategoryId,
+      },
+    }),
+  ]);
+
+  const result = subcategories.map((sub) => {
+    const translation =
+      sub.translations.find((t) => t.languageCode === lang) ??
+      sub.translations.find((t) => t.languageCode === 'hi') ??
+      sub.translations.find((t) => t.languageCode === 'en') ??
+      sub.translations[0];
+
+    return {
+      id: sub.id,
+      slug: sub.slug,
+      categoryId: sub.categoryId,
+      parent: sub.parentId,
+      lang: translation?.languageCode || lang,
+      name: translation?.name || '',
+      description: translation?.description || null,
+    };
+  });
+
+  const finalResult = { result, total };
+
+  await this.cache.set(cacheKey, finalResult, 600);
+
+  return finalResult;
+}
+
+
+
+  async findByCategory(categoryId: number, subcategoryId?: number, lang = 'hi', skip = 0, take = 10) {
     const version =
       (await this.cache.get<number>('subcategories:version')) || 1;
 
@@ -119,7 +247,7 @@ WHERE s.id = ${subcategory.id};
     const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
     const [subcategories, total] = await Promise.all([
       this.prisma.subcategory.findMany({
-        where: { categoryId },
+        where: { categoryId, level: 0, parentId: subcategoryId ? subcategoryId : undefined },
         include: {
           translations: {
             where: {
