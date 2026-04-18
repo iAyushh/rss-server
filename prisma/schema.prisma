@@ -124,6 +124,167 @@ model SystemSetting {
   @@map("system_setting")
 }
 
+model Category {
+  id            Int                      @id @default(autoincrement())
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  slug          String                   @unique
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+  searchVector  Unsupported("tsvector")? @map("search_vector")
+  translations  CategoryTranslation[]
+  contentTypes  ContentType[]
+  subcategories Subcategory[]
+
+  @@map("category")
+}
+
+model CategoryTranslation {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  categoryId   Int      @map("category_id")
+  languageCode String   @map("language_code")
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, languageCode])
+  @@map("category_translation")
+}
+
+model Subcategory {
+  id           Int                      @id @default(autoincrement())
+  categoryId   Int                      @map("category_id")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+  slug         String
+  searchVector Unsupported("tsvector")? @map("search_vector")
+  level        Int                      @default(0)
+  parentId     Int?                     @map("parent_id")
+  contentTypes ContentType[]
+  category     Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  translations SubcategoryTranslation[]
+
+  @@unique([categoryId, slug])
+  @@map("subcategory")
+}
+
+model SubcategoryTranslation {
+  id            Int         @id @default(autoincrement())
+  name          String
+  description   String?
+  languageCode  String      @map("language_code")
+  subcategoryId Int         @map("subcategory_id")
+  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([subcategoryId, languageCode])
+  @@map("subcategory_translation")
+}
+
+model ContentType {
+  id            Int                      @id @default(autoincrement())
+  categoryId    Int                      @map("category_id")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+  subcategoryId Int?                     @map("subcategory_id")
+  contentYear   Int                      @map("content_year")
+  status        ContentStatus            @default(DRAFT)
+  searchVector  Unsupported("tsvector")? @map("search_vector")
+  slug          String
+  metadata      ContentMetadata[]
+  category      Category                 @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory?             @relation(fields: [subcategoryId], references: [id])
+  translations  ContentTypeTranslation[]
+  files    FileAsset[]
+
+  @@unique([slug, contentYear])
+  @@index([categoryId, contentYear])
+  @@index([subcategoryId, contentYear])
+  @@index([contentYear])
+  @@map("content_type")
+}
+
+model ContentTypeTranslation {
+  id            Int         @id @default(autoincrement())
+  contentTypeId Int         @map("content_type_id")
+  languageCode  String      @map("language_code")
+  name          String
+  description   String?
+  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([contentTypeId, languageCode])
+  @@map("content_type_translation")
+}
+
+model FileAsset {
+  id         Int      @id @default(autoincrement())
+  fileSize   Int      @map("file_size")
+  mimeType   String   @map("mime_type")
+  storageKey String   @unique @map("storage_key")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  contentTypeId Int?     @map("content_type_id")
+  extension     String
+  fileType      FileType
+  originalName  String?  @map("original_name")
+
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  contentYear Int?      @map("content_year")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  url         String?
+
+  contentType ContentType? @relation(fields: [contentTypeId], references: [id], onDelete: SetNull)
+
+  metadata     FileMetadata[]
+  translations FileTranslation[]
+
+  @@index([fileType])
+  @@index([contentYear])
+  @@index([updatedAt])
+  @@index([fileSize])
+  @@index([contentTypeId])
+  @@index([contentTypeId, updatedAt])
+  @@map("file_asset")
+}
+
+model FileTranslation {
+  id           Int       @id @default(autoincrement())
+  fileId       Int       @map("file_id")
+  languageCode String    @map("language_code")
+  displayName  String
+  description  String?
+  file         FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, languageCode])
+  @@index([languageCode])
+  @@map("file_translation")
+}
+
+model FileMetadata {
+  id     Int       @id @default(autoincrement())
+  fileId Int       @map("file_id")
+  key    String
+  value  String
+  file   FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([fileId])
+  @@map("file_metadata")
+}
+
+model ContentMetadata {
+  id            Int         @id @default(autoincrement())
+  contentTypeId Int         @map("content_type_id")
+  key           String
+  value         String
+  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([value])
+  @@index([key, value])
+  @@index([contentTypeId])
+  @@map("content_metadata")
+}
+
 enum AdminStatus {
   Active @map("active")
 
@@ -159,60 +320,6 @@ enum SettingContext {
   @@map("setting_context")
 }
 
-model Category {
-  id            Int                   @id @default(autoincrement())
-  slug          String                @unique
-  createdAt     DateTime              @default(now()) @map("created_at")
-  updatedAt     DateTime              @updatedAt @map("updated_at")
-  translations  CategoryTranslation[]
-  subcategories Subcategory[]
-  contentTypes  ContentType[]
-
-  searchVector Unsupported("tsvector")? @map("search_vector")
-
-  @@map("category")
-}
-
-model CategoryTranslation {
-  id           Int      @id @default(autoincrement())
-  categoryId   Int      @map("category_id")
-  languageCode String   @map("language_code")
-  name         String
-  description  String?
-  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([categoryId, languageCode])
-  @@map("category_translation")
-}
-
-model Subcategory {
-  id           Int                      @id @default(autoincrement())
-  slug         String
-  categoryId   Int                      @map("category_id")
-  createdAt    DateTime                 @default(now()) @map("created_at")
-  updatedAt    DateTime                 @updatedAt @map("updated_at")
-  category     Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  translations SubcategoryTranslation[]
-  contentTypes ContentType[]
-
-  searchVector Unsupported("tsvector")? @map("search_vector")
-
-  @@unique([categoryId, slug])
-  @@map("subcategory")
-}
-
-model SubcategoryTranslation {
-  id            Int         @id @default(autoincrement())
-  subcategoryId Int         @map("subcategory_id")
-  languageCode  String      @map("language_code")
-  name          String
-  description   String?
-  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
-
-  @@unique([subcategoryId, languageCode])
-  @@map("subcategory_translation")
-}
-
 enum FileType {
   IMAGE
   PDF
@@ -231,128 +338,4 @@ enum ContentStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
-}
-
-model ContentType {
-  id Int @id @default(autoincrement())
-
-  slug String
-
-  categoryId    Int  @map("category_id")
-  subcategoryId Int? @map("subcategory_id")
-
-  contentYear Int @map("content_year")
-
-  status ContentStatus @default(DRAFT)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
-
-  translations ContentTypeTranslation[]
-  files        FileAsset[]
-  metadata     ContentMetadata[]
-
- 
-  searchVector Unsupported("tsvector")? @map("search_vector")
-
-  @@unique([slug, contentYear])
-  @@index([categoryId, contentYear])
-  @@index([subcategoryId, contentYear])
-  @@index([contentYear])
-  @@map("content_type")
-}
-
-model ContentTypeTranslation {
-  id            Int     @id @default(autoincrement())
-  contentTypeId Int     @map("content_type_id")
-  languageCode  String  @map("language_code")
-  name          String
-  description   String?
-
-  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
-
-  @@unique([contentTypeId, languageCode])
-  @@map("content_type_translation")
-}
-
-model FileAsset {
-  id           Int     @id @default(autoincrement())
-  originalName String? @map("original_name")
-
-  storageKey String @unique @map("storage_key")
-  fileSize   Int    @map("file_size")
-  mimeType   String @map("mime_type")
-  extension  String
-
-  fileType    FileType
-  contentYear Int?     @map("content_year")
-
-   url String? 
-
-  uploadedAt DateTime @default(now()) @map("uploaded_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
-
-  contentTypeId Int         @map("content_type_id")
-  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
-
-  translations FileTranslation[]
-  metadata     FileMetadata[]
-
-  searchVector Unsupported("tsvector")? @map("search_vector")
-
-  @@index([fileType])
-  @@index([contentYear])
-  @@index([updatedAt])
-  @@index([fileSize])
-  @@index([contentTypeId])
-  @@index([contentTypeId, updatedAt])
-  @@map("file_asset")
-}
-
-model FileTranslation {
-  id           Int    @id @default(autoincrement())
-  fileId       Int    @map("file_id")
-  languageCode String @map("language_code")
-
-  displayName String
-  description String?
-
-  file FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
-
-  @@unique([fileId, languageCode])
-  @@index([languageCode])
-  @@map("file_translation")
-}
-
-model FileMetadata {
-  id     Int    @id @default(autoincrement())
-  fileId Int    @map("file_id")
-  key    String
-  value  String
-
-  file FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
-
-  @@index([key])
-  @@index([fileId])
-  @@map("file_metadata")
-}
-
-model ContentMetadata {
-  id            Int    @id @default(autoincrement())
-  contentTypeId Int    @map("content_type_id")
-  key           String
-  value         String
-
-  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
-
-  @@index([key])
-  @@index([value])
-  @@index([key, value])
-  @@index([contentTypeId])
-  @@map("content_metadata")
 }

@@ -6,7 +6,6 @@ import { FILE_TYPE_MIME_MAP } from '../common/constants/file-type-mime.map';
 import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
 import { I18nService } from 'nestjs-i18n';
-import cloudinary from 'src/configs/cloudinary.config';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from 'src/configs/amazonS3.config';
 
@@ -16,33 +15,7 @@ export class IngestionService {
     private readonly prisma: PrismaService,
     private readonly fileService: FileService,
     private readonly i18n: I18nService,
-  ) {}
-
-  // private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
-  //   return new Promise((resolve, reject) => {
-  //     const originalName = file.originalname;
-  //     const baseName = originalName.replace(/\.[^/.]+$/, '');
-
-  //     const stream = cloudinary.uploader.upload_stream(
-  //       {
-  //         folder: 'rss-uploads',
-  //         resource_type: 'raw',
-  //         public_id: baseName,
-  //         overwrite: true,
-  //         access_mode: 'public',
-  //       },
-  //       (error, result) => {
-  //         if (error) {
-  //           return reject(error);
-  //         }
-
-  //         resolve(result?.secure_url || '');
-  //       },
-  //     );
-
-  //     stream.end(file.buffer);
-  //   });
-  // }
+  ) { }
 
   async uploadToS3(file: Express.Multer.File): Promise<string> {
     const fileName = `${Date.now()}-${file.originalname}`;
@@ -51,9 +24,7 @@ export class IngestionService {
       Bucket: process.env.AWS_BUCKET_NAME!,
       Key: `rss-uploads/${fileName}`,
       Body: file.buffer,
-
       ContentType: file.mimetype,
-
       ContentDisposition: 'inline',
     });
 
@@ -73,6 +44,7 @@ export class IngestionService {
     }
 
     const allowedMimes = FILE_TYPE_MIME_MAP[type];
+
     if (allowedMimes?.length) {
       for (const file of files) {
         if (!allowedMimes.includes(file.mimetype)) {
@@ -112,12 +84,19 @@ export class IngestionService {
       throw new BadRequestException('No files uploaded');
     }
 
-    const contentType = await this.prisma.contentType.findUnique({
-      where: { id: dto.contentTypeId },
-    });
+    
+    let contentTypeId: number | null = null;
 
-    if (!contentType) {
-      throw new BadRequestException('Invalid contentTypeId');
+    if (dto.contentTypeId) {
+      const contentType = await this.prisma.contentType.findUnique({
+        where: { id: dto.contentTypeId },
+      });
+
+      if (!contentType) {
+        throw new BadRequestException('Invalid contentTypeId');
+      }
+
+      contentTypeId = contentType.id;
     }
 
     this.validateFiles(files, dto.type, dto.lang ?? 'hi');
@@ -152,7 +131,6 @@ export class IngestionService {
 
     const assets = await this.prisma.$transaction(async (tx) => {
       const lang = dto.lang ?? 'hi';
-
       const createdAssets = [];
 
       for (const file of normalizedFiles) {
@@ -160,7 +138,7 @@ export class IngestionService {
 
         const asset = await tx.fileAsset.create({
           data: {
-            contentTypeId: dto.contentTypeId,
+            contentTypeId: contentTypeId,
             originalName: file.originalName,
             storageKey: file.storageKey,
             mimeType: file.mimeType,
@@ -230,21 +208,21 @@ export class IngestionService {
 
     if (ids.length > 0) {
       await this.prisma.$executeRaw`
-      UPDATE file_asset f
-      SET search_vector =
-        to_tsvector(
-          'simple',
-          COALESCE(
-            (
-              SELECT string_agg(ft."displayName",' ')
-              FROM file_translation ft
-              WHERE ft.file_id = f.id
-            ),
-            ''
+        UPDATE file_asset f
+        SET search_vector =
+          to_tsvector(
+            'simple',
+            COALESCE(
+              (
+                SELECT string_agg(ft."displayName",' ')
+                FROM file_translation ft
+                WHERE ft.file_id = f.id
+              ),
+              ''
+            )
           )
-        )
-      WHERE f.id IN (${Prisma.join(ids)});
-    `;
+        WHERE f.id IN (${Prisma.join(ids)});
+      `;
     }
 
     return {

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsInt, ValidateNested } from 'class-validator';
+import { IsArray, IsInt, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SubcategoryTranslationDto } from './subcategory-translation.dto';
 
@@ -7,6 +7,11 @@ export class CreateSubcategoryRequestDto {
   @ApiProperty()
   @IsInt()
   categoryId!: number;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsInt()
+  parentId!: number;
 
   @ApiProperty({ type: [SubcategoryTranslationDto] })
   @IsArray()

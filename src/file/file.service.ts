@@ -492,31 +492,14 @@ export class FileService {
     const where: Prisma.FileAssetWhereInput = {
       ...(type && { fileType: type }),
 
-      OR: [
-        {
-          metadata: {
-            some: {
-              AND: [{ key: 'categoryId' }, { value: String(categoryId) }],
-            },
-          },
+      metadata: {
+        some: {
+          AND: [{ key: 'categoryId' }, { value: String(categoryId) }],
         },
-
-        {
-          metadata: {
-            some: {
-              AND: [
-                { key: 'category' },
-                {
-                  value: {
-                    equals: categoryName,
-                    mode: 'insensitive',
-                  },
-                },
-              ],
-            },
-          },
-        },
-      ],
+        none: {
+          key: 'subcategoryId',
+        }
+      },
     };
 
     const [files, total] = await Promise.all([
