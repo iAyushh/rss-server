@@ -14,25 +14,25 @@ export class QueueModule {
       inject: [ConfigService, RedisService],
 
       useFactory: (
-  configService: ConfigService<EnvironmentVariables, true>,
-  redisService: RedisService,
-) => {
-  return {
-    connection: redisService.getClient(),
+        configService: ConfigService<EnvironmentVariables, true>,
+        redisService: RedisService,
+      ) => {
+        return {
+          connection: redisService.getClient(),
 
-    defaultJobOptions: {
-      removeOnComplete: true,
-      removeOnFail: {
-        age: 86400,
+          defaultJobOptions: {
+            removeOnComplete: true,
+            removeOnFail: {
+              age: 86400,
+            },
+            attempts: 2,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+          },
+        };
       },
-      attempts: 2,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
-      },
-    },
-  };
-},
     });
   }
 }

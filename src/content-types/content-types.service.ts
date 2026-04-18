@@ -17,7 +17,7 @@ export class ContentTypeService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) { }
+  ) {}
 
   private async invalidateCache() {
     const version =
@@ -81,11 +81,11 @@ export class ContentTypeService {
 
           metadata: dto.metadata
             ? {
-              create: dto.metadata.map((m) => ({
-                key: m.key,
-                value: m.value,
-              })),
-            }
+                create: dto.metadata.map((m) => ({
+                  key: m.key,
+                  value: m.value,
+                })),
+              }
             : undefined,
         },
 
@@ -126,7 +126,9 @@ WHERE ct.id = ${content.id};
 
     const cacheKey = `content-types:${version}:${lang}:${categoryId ?? 'all'}:${subcategoryId ?? 'all'}:${skip}:${take}`;
 
-    const cached = await this.cache.get<{ data: any[]; total: number }>(cacheKey);
+    const cached = await this.cache.get<{ data: any[]; total: number }>(
+      cacheKey,
+    );
     if (cached) return cached;
 
     const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
@@ -166,10 +168,10 @@ WHERE ct.id = ${content.id};
 
     const result = contents.map((content) => {
       let translation =
-        content.translations.find(t => t.languageCode === lang)
-        ?? content.translations.find(t => t.languageCode === 'hi')
-        ?? content.translations.find(t => t.languageCode === 'en')
-        ?? content.translations[0];
+        content.translations.find((t) => t.languageCode === lang) ??
+        content.translations.find((t) => t.languageCode === 'hi') ??
+        content.translations.find((t) => t.languageCode === 'en') ??
+        content.translations[0];
       return {
         id: content.id,
         categoryId: content.categoryId,
@@ -325,7 +327,7 @@ WHERE ct.id = ${content.id};
 
         if (
           !result[year].categories[category.slug].subcategories[
-          subcategory.slug
+            subcategory.slug
           ]
         ) {
           result[year].categories[category.slug].subcategories[

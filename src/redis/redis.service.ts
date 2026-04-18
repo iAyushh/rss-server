@@ -1,8 +1,5 @@
 import { Redis } from 'ioredis';
-import {
-  Injectable,
-  OnApplicationShutdown,
-} from '@nestjs/common';
+import { Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '@Common';
 
@@ -16,7 +13,6 @@ export class RedisService implements OnApplicationShutdown {
     this.client = new Redis(this.configService.get('REDIS_URI'), {
       lazyConnect: false,
       maxRetriesPerRequest: null,
-
 
       retryStrategy: (times) => {
         if (times > 3) return null; // stop retrying after 3 attempts

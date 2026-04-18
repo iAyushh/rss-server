@@ -1,48 +1,30 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FileService } from '../file/file.service';
 import { IngestionDto } from './dto';
 import { FILE_TYPE_MIME_MAP } from '../common/constants/file-type-mime.map';
 import { FileType, Prisma } from '@prisma/client';
 import * as path from 'node:path';
 import { I18nService } from 'nestjs-i18n';
-import cloudinary from 'src/configs/cloudinary.config';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from 'src/configs/amazonS3.config';
 
+type NormalizedFile = {
+  originalName: string;
+  storageKey: string;
+  url: string;
+  mimeType: string;
+  extension: string;
+  fileSize: number;
+  fileType?: FileType;
+  displayName: string;
+  description: string | null;
+};
 @Injectable()
 export class IngestionService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fileService: FileService,
     private readonly i18n: I18nService,
   ) {}
-
-  // private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
-  //   return new Promise((resolve, reject) => {
-  //     const originalName = file.originalname;
-  //     const baseName = originalName.replace(/\.[^/.]+$/, '');
-
-  //     const stream = cloudinary.uploader.upload_stream(
-  //       {
-  //         folder: 'rss-uploads',
-  //         resource_type: 'raw',
-  //         public_id: baseName,
-  //         overwrite: true,
-  //         access_mode: 'public',
-  //       },
-  //       (error, result) => {
-  //         if (error) {
-  //           return reject(error);
-  //         }
-
-  //         resolve(result?.secure_url || '');
-  //       },
-  //     );
-
-  //     stream.end(file.buffer);
-  //   });
-  // }
 
   async uploadToS3(file: Express.Multer.File): Promise<string> {
     const fileName = `${Date.now()}-${file.originalname}`;
@@ -112,27 +94,33 @@ export class IngestionService {
       throw new BadRequestException('No files uploaded');
     }
 
-    const contentType = await this.prisma.contentType.findUnique({
-      where: { id: dto.contentTypeId },
+    if (!dto.categoryId) {
+      throw new BadRequestException('categoryId is required');
+    }
+
+    const category = await this.prisma.category.findUnique({
+      where: { id: dto.categoryId },
     });
 
-    if (!contentType) {
-      throw new BadRequestException('Invalid contentTypeId');
+    if (!category) {
+      throw new BadRequestException('Invalid categoryId');
+    }
+
+    let subcategory = null;
+
+    if (dto.subcategoryId) {
+      subcategory = await this.prisma.subcategory.findUnique({
+        where: { id: dto.subcategoryId },
+      });
+
+      if (!subcategory || subcategory.categoryId !== dto.categoryId) {
+        throw new BadRequestException('Invalid subcategory for this category');
+      }
     }
 
     this.validateFiles(files, dto.type, dto.lang ?? 'hi');
 
-    const normalizedFiles: {
-      originalName: string;
-      storageKey: string;
-      url: string;
-      mimeType: string;
-      extension: string;
-      fileSize: number;
-      fileType: FileType | undefined;
-      displayName: string;
-      description: string | null;
-    }[] = [];
+    const normalizedFiles: NormalizedFile[] = [];
 
     for (const file of files) {
       const url = await this.uploadToS3(file);
@@ -152,7 +140,6 @@ export class IngestionService {
 
     const assets = await this.prisma.$transaction(async (tx) => {
       const lang = dto.lang ?? 'hi';
-
       const createdAssets = [];
 
       for (const file of normalizedFiles) {
@@ -160,7 +147,9 @@ export class IngestionService {
 
         const asset = await tx.fileAsset.create({
           data: {
-            contentTypeId: dto.contentTypeId,
+            categoryId: dto.categoryId,
+            subcategoryId: dto.subcategoryId ?? null,
+
             originalName: file.originalName,
             storageKey: file.storageKey,
             mimeType: file.mimeType,
@@ -198,11 +187,7 @@ export class IngestionService {
         }
 
         for (const [key, value] of Object.entries(metadata)) {
-          if (
-            value !== undefined &&
-            value !== null &&
-            !['category', 'subcategory'].includes(key)
-          ) {
+          if (value !== undefined && value !== null) {
             metadataRows.push({
               key,
               value: String(value),

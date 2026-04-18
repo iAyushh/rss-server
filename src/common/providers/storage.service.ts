@@ -14,14 +14,11 @@ export class StorageService {
     private readonly config: ConfigType<typeof storageConfigFactory>,
   ) {
     this.defaultMulterOptions = {
-
       storage: memoryStorage(),
-
 
       limits: {
         fileSize: this.config.maxFileSize,
       },
-
 
       fileFilter: (req, file, cb) => {
         const extension = extname(file.originalname).toLowerCase();

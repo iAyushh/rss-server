@@ -24,7 +24,7 @@ import { Response } from 'express';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('categories')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) { }
+  constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
   create(@Body() dto: CreateCategoryRequestDto, @I18nLang() lang: string) {
@@ -46,7 +46,6 @@ export class CategoryController {
       take ? Number(take) : 20,
     );
   }
-
 
   @Get(':categoryId/combined')
   async getCategoryCombined(

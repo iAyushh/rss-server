@@ -34,13 +34,12 @@ const categoryToTypesMap: Record<FileCategory, FileType[]> = {
   others: ['OTHER'],
 };
 
-
 @Injectable()
 export class FileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
-  ) { }
+  ) {}
 
   getPublicUrl(storageKey: string) {
     return storageKey;
@@ -189,7 +188,6 @@ export class FileService {
     };
   }
 
-
   async getFileStats() {
     const data = await this.prisma.fileAsset.groupBy({
       by: ['fileType'],
@@ -231,7 +229,6 @@ export class FileService {
   }) {
     const { type, skip, take, lang } = options;
 
-
     const categoryToTypesMap: Record<FileCategory, FileType[]> = {
       [FileCategory.MEDIA]: ['IMAGE', 'VIDEO', 'AUDIO'],
       [FileCategory.DOCS]: ['PDF', 'WORD', 'TEXT'],
@@ -249,7 +246,6 @@ export class FileService {
       }),
     };
 
-
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({
         where,
@@ -266,7 +262,6 @@ export class FileService {
       this.prisma.fileAsset.count({ where }),
     ]);
 
-
     const categoryIds = new Set<number>();
     const subcategoryIds = new Set<number>();
 
@@ -278,7 +273,6 @@ export class FileService {
       if (sub) subcategoryIds.add(Number(sub));
     });
 
-
     const [categories, subcategories] = await Promise.all([
       this.prisma.category.findMany({
         where: { id: { in: Array.from(categoryIds) } },
@@ -289,7 +283,6 @@ export class FileService {
         include: { translations: true },
       }),
     ]);
-
 
     const categoryMap = new Map<number, string>();
     categories.forEach((c) => {
@@ -309,7 +302,6 @@ export class FileService {
       if (name) subcategoryMap.set(s.id, name);
     });
 
-
     return {
       data: files.map((f) => {
         const categoryId = Number(
@@ -328,7 +320,6 @@ export class FileService {
           contentYear: f.contentYear,
           uploadedAt: f.uploadedAt,
 
-
           category: categoryMap.get(categoryId) || null,
           subcategory: subcategoryMap.get(subcategoryId) || null,
 
@@ -344,8 +335,6 @@ export class FileService {
       take,
     };
   }
-
-
 
   async getAllFiles(options: {
     contentTypeId?: number;
@@ -393,8 +382,8 @@ export class FileService {
     const orderBy:
       | Prisma.FileAssetOrderByWithRelationInput
       | Prisma.FileAssetOrderByWithRelationInput[] = cleanSortBy
-        ? { [cleanSortBy]: cleanOrder }
-        : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
+      ? { [cleanSortBy]: cleanOrder }
+      : [{ contentYear: 'desc' }, { updatedAt: 'desc' }];
 
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({
@@ -474,7 +463,6 @@ export class FileService {
     };
   }
 
-
   async getFilesByCategory(categoryId: number, params?: any) {
     const { skip = 0, take = 20, type, lang = 'hi' } = params || {};
 
@@ -498,7 +486,7 @@ export class FileService {
         },
         none: {
           key: 'subcategoryId',
-        }
+        },
       },
     };
 
@@ -803,7 +791,6 @@ export class FileService {
 
     try {
       if (file.storageKey) {
-
         const url = new URL(file.storageKey);
         const key = url.pathname.substring(1);
 
@@ -817,7 +804,6 @@ export class FileService {
     } catch (err) {
       console.warn('S3 deletion failed:', err.message);
     }
-
 
     await this.prisma.$transaction([
       this.prisma.fileMetadata.deleteMany({

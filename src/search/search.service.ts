@@ -25,9 +25,10 @@ type FileWithRelations = Prisma.FileAssetGetPayload<{
 }>;
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService,
+  constructor(
+    private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) { }
+  ) {}
 
   private parseSearchQuery(query: string) {
     const tokens = query.trim().split(/\s+/);
@@ -56,9 +57,6 @@ export class SearchService {
     take = 20,
     year?: number,
   ) {
-
-
-
     const normalizedQuery = (query || '').trim().toLowerCase();
 
     const cacheKey = `search:global:${normalizedQuery}:${languageCode}:${skip}:${take}:${year ?? 'all'}`;
@@ -236,8 +234,6 @@ LIMIT ${take} OFFSET ${skip}
     sortBy?: 'updatedAt' | 'fileSize' | 'originalName' | 'name',
     order?: 'asc' | 'desc',
   ) {
-
-
     const normalizedQuery = (search || '').trim().toLowerCase();
 
     const cacheKey = `search:files:${normalizedQuery}:${languageCode}:${skip}:${take}:${year ?? 'all'}:${sortBy ?? 'none'}:${order ?? 'desc'}`;

@@ -29,7 +29,7 @@ import { Response } from 'express';
 @UseGuards(JwtAuthGuard, AccessGuard)
 @Controller('content-types')
 export class ContentTypeController {
-  constructor(private readonly contentTypeService: ContentTypeService) { }
+  constructor(private readonly contentTypeService: ContentTypeService) {}
 
   @Post()
   create(@Body() dto: CreateContentTypeDto) {
@@ -88,7 +88,6 @@ export class ContentTypeController {
     );
   }
 
-  
   @Roles(UserType.Admin)
   @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
   @Patch(':id')

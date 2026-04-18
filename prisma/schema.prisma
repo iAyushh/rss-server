@@ -166,9 +166,9 @@ model Category {
   updatedAt     DateTime              @updatedAt @map("updated_at")
   translations  CategoryTranslation[]
   subcategories Subcategory[]
-  contentTypes  ContentType[]
 
   searchVector Unsupported("tsvector")? @map("search_vector")
+  fileAssets   FileAsset[]
 
   @@map("category")
 }
@@ -195,9 +195,9 @@ model Subcategory {
   updatedAt    DateTime                 @updatedAt @map("updated_at")
   category     Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   translations SubcategoryTranslation[]
-  contentTypes ContentType[]
 
   searchVector Unsupported("tsvector")? @map("search_vector")
+  fileAssets   FileAsset[]
 
   @@unique([categoryId, slug])
   @@map("subcategory")
@@ -229,56 +229,6 @@ enum FileType {
   @@map("file_type")
 }
 
-enum ContentStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-model ContentType {
-  id Int @id @default(autoincrement())
-
-  slug String
-
-  categoryId    Int  @map("category_id")
-  subcategoryId Int? @map("subcategory_id")
-
-  contentYear Int @map("content_year")
-
-  status ContentStatus @default(DRAFT)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
-
-  translations ContentTypeTranslation[]
-  files        FileAsset[]
-  metadata     ContentMetadata[]
-
-  searchVector Unsupported("tsvector")? @map("search_vector")
-
-  @@unique([slug, contentYear])
-  @@index([categoryId, contentYear])
-  @@index([subcategoryId, contentYear])
-  @@index([contentYear])
-  @@map("content_type")
-}
-
-model ContentTypeTranslation {
-  id            Int     @id @default(autoincrement())
-  contentTypeId Int     @map("content_type_id")
-  languageCode  String  @map("language_code")
-  name          String
-  description   String?
-
-  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
-
-  @@unique([contentTypeId, languageCode])
-  @@map("content_type_translation")
-}
-
 model FileAsset {
   id           Int     @id @default(autoincrement())
   originalName String? @map("original_name")
@@ -298,20 +248,23 @@ model FileAsset {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
 
-  contentTypeId Int         @map("content_type_id")
-  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+  categoryId Int      @map("category_id")
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  subcategoryId Int?         @map("subcategory_id")
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
 
   translations FileTranslation[]
   metadata     FileMetadata[]
 
   searchVector Unsupported("tsvector")? @map("search_vector")
 
+  @@index([categoryId])
+  @@index([subcategoryId])
   @@index([fileType])
   @@index([contentYear])
   @@index([updatedAt])
   @@index([fileSize])
-  @@index([contentTypeId])
-  @@index([contentTypeId, updatedAt])
   @@map("file_asset")
 }
 
@@ -341,19 +294,4 @@ model FileMetadata {
   @@index([key])
   @@index([fileId])
   @@map("file_metadata")
-}
-
-model ContentMetadata {
-  id            Int    @id @default(autoincrement())
-  contentTypeId Int    @map("content_type_id")
-  key           String
-  value         String
-
-  contentType ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
-
-  @@index([key])
-  @@index([value])
-  @@index([key, value])
-  @@index([contentTypeId])
-  @@map("content_metadata")
 }
