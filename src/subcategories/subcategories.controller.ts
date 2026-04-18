@@ -8,8 +8,9 @@ import {
   Patch,
   UseGuards,
   Query,
-  Res,
+  BadRequestException,
   ParseIntPipe,
+  Res,
 } from '@nestjs/common';
 import { I18nLang } from 'nestjs-i18n';
 import { SubcategoriesService } from './subcategories.service';
@@ -22,6 +23,7 @@ import { AccessGuard, JwtAuthGuard, RolesGuard, Roles } from '@Common';
 import { UserType } from '@Common';
 import { Response } from 'express';
 
+
 @ApiBearerAuth()
 @ApiTags('Subcategory')
 @Roles(UserType.Admin)
@@ -30,10 +32,12 @@ import { Response } from 'express';
 export class SubcategoriesController {
   constructor(private readonly subcategoriesService: SubcategoriesService) { }
 
+
   @Post()
-  create(@Body() dto: CreateSubcategoryRequestDto, @I18nLang() lang: string) {
+  async create(@Body() dto: CreateSubcategoryRequestDto, @I18nLang() lang: string) {
     return this.subcategoriesService.create(dto, lang);
   }
+
 
   @Get('category/:categoryId')
   findByCategory(
@@ -55,14 +59,6 @@ export class SubcategoriesController {
     );
   }
 
-  @Get(':id')
-  async getSingleSubcategory(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('lang') lang: string = 'hi',
-  ) {
-    return this.subcategoriesService.getSubcategory(id, lang);
-  }
-
   @Get('children')
   async getSubcategories(
     @Query('parentId') parentId: string,
@@ -70,16 +66,21 @@ export class SubcategoriesController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
-    console.log({ parentId, skip, take });
-
     return this.subcategoriesService.getChildren(
-      Number(parentId),
+      Number(parentId || 0),
       lang,
       Number(skip || 0),
       Number(take || 10),
     );
   }
 
+  @Get(':id')
+  async getSingleSubcategory(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('lang') lang: string = 'hi',
+  ) {
+    return this.subcategoriesService.getSubcategory(id, undefined, lang);
+  }
 
   @Patch(':id')
   update(
@@ -94,3 +95,6 @@ export class SubcategoriesController {
     return this.subcategoriesService.remove(Number(id), lang);
   }
 }
+
+
+

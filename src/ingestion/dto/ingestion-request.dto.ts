@@ -5,6 +5,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class IngestionDto {
   @Type(() => Number)
+  @IsOptional()
   @IsInt()
   contentTypeId!: number;
 
