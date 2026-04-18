@@ -106,18 +106,26 @@ export class CategoryService {
     }
   }
 
-  async findAll(lang: string, skip = 0, take = 20) {
+  async findAll(
+    lang: string,
+    skip = 0,
+    take = 20,
+    id?: number,
+  ) {
     const version = (await this.cache.get<number>('categories:version')) || 1;
 
-    const cacheKey = `categories:${version}:${lang}:${skip}:${take}`;
+    const cacheKey = `categories:${version}:${lang}:${skip}:${take}:${id || 'all'}`;
 
     const cached = await this.cache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
+    const where = id ? { id } : {};
+
     const [categories, total] = await Promise.all([
       this.prisma.category.findMany({
+        where,
         select: {
           id: true,
           slug: true,
@@ -132,20 +140,20 @@ export class CategoryService {
               name: true,
               description: true,
             },
-          }
+          },
         },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        skip,
-        take,
+        skip: id ? 0 : skip,
+        take: id ? 1 : take,
       }),
-      this.prisma.category.count(),
+      this.prisma.category.count({ where }),
     ]);
 
     const data = categories.map((cat) => {
       const translation =
-        cat.translations.find(t => t.languageCode === lang) ||
-        cat.translations.find(t => t.languageCode === 'en') ||
-        cat.translations.find(t => t.languageCode === 'hi');
+        cat.translations.find((t) => t.languageCode === lang) ||
+        cat.translations.find((t) => t.languageCode === 'en') ||
+        cat.translations.find((t) => t.languageCode === 'hi');
 
       return {
         id: cat.id,
@@ -162,6 +170,7 @@ export class CategoryService {
 
     return result;
   }
+
 
 
   async getCategoryCombined(options: {

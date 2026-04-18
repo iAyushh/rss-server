@@ -37,13 +37,15 @@ export class CategoryController {
     @Res({ passthrough: true }) res: Response,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
+    @Query('id') id?: number,
   ) {
-    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+    (res as any).setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
 
     return this.categoryService.findAll(
       lang,
       skip ? Number(skip) : 0,
       take ? Number(take) : 20,
+      id ? Number(id) : undefined,
     );
   }
 
