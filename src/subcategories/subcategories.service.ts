@@ -192,61 +192,44 @@ export class SubcategoriesService {
 
 
   async getSubcategory(
-    categoryId?: number,
-    parentId?: number,
+    id: number,
     lang = 'hi',
-    skip = 0,
-    take = 10,
   ) {
     const languages = lang === 'hi' ? ['hi', 'en'] : [lang, 'hi'];
 
-    const where: any = {
-      ...(categoryId && { categoryId }),
-      ...(parentId !== undefined && { parentId }),
-    };
-
-    const [subcategories, total] = await Promise.all([
-      this.prisma.subcategory.findMany({
-        where,
-        include: {
-          translations: {
-            where: {
-              languageCode: { in: languages },
-            },
+    const subcategory = await this.prisma.subcategory.findUnique({
+      where: { id },
+      include: {
+        translations: {
+          where: {
+            languageCode: { in: languages },
           },
         },
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.subcategory.count({ where }),
-    ]);
-
-    const data = subcategories.map((subcategory) => {
-      const translation =
-        subcategory.translations.find((t) => t.languageCode === lang) ??
-        subcategory.translations.find((t) => t.languageCode === 'hi') ??
-        subcategory.translations.find((t) => t.languageCode === 'en') ??
-        subcategory.translations[0];
-
-      return {
-        id: subcategory.id,
-        slug: subcategory.slug,
-        categoryId: subcategory.categoryId,
-        parentId: subcategory.parentId,
-        level: subcategory.level,
-        lang: translation?.languageCode || lang,
-        name: translation?.name || '',
-        description: translation?.description || null,
-        createdAt: subcategory.createdAt,
-      };
+      },
     });
 
+    if (!subcategory) {
+      throw new NotFoundException(
+        this.i18n.t('common.errors.SUBCATEGORY_NOT_FOUND', { lang }),
+      );
+    }
+
+    const translation =
+      subcategory.translations.find((t) => t.languageCode === lang) ??
+      subcategory.translations.find((t) => t.languageCode === 'hi') ??
+      subcategory.translations.find((t) => t.languageCode === 'en') ??
+      subcategory.translations[0];
+
     return {
-      data,
-      total,
-      skip,
-      take,
+      id: subcategory.id,
+      slug: subcategory.slug,
+      categoryId: subcategory.categoryId,
+      parentId: subcategory.parentId,
+      level: subcategory.level,
+      lang: translation?.languageCode || lang,
+      name: translation?.name || '',
+      description: translation?.description || null,
+      createdAt: subcategory.createdAt,
     };
   }
 
@@ -373,7 +356,7 @@ export class SubcategoriesService {
       translations.find((t) => t.languageCode === 'en') ||
       translations[0];
 
-   
+
     const files = await this.prisma.fileAsset.findMany({
       where: {
         metadata: {
@@ -389,7 +372,7 @@ export class SubcategoriesService {
       orderBy: { createdAt: 'desc' },
     });
 
-    
+
     const children = await this.prisma.subcategory.findMany({
       where: {
         parentId: subcategoryId,
@@ -404,7 +387,7 @@ export class SubcategoriesService {
       orderBy: { createdAt: 'asc' },
     });
 
-    
+
     const formattedFiles = files.map((file) => {
       const t = resolveTranslation(file.translations || []);
       return {
@@ -417,7 +400,7 @@ export class SubcategoriesService {
       };
     });
 
-    
+
     const formattedChildren = children.map((child) => {
       const t = resolveTranslation(child.translations);
       return {
@@ -430,7 +413,7 @@ export class SubcategoriesService {
       };
     });
 
-    
+
     return {
       subcategoryId,
       data: [...formattedChildren, ...formattedFiles],

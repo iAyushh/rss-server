@@ -79,7 +79,7 @@ export class SubcategoriesController {
     @Param('id', ParseIntPipe) id: number,
     @Query('lang') lang: string = 'hi',
   ) {
-    return this.subcategoriesService.getSubcategory(id, undefined, lang);
+    return this.subcategoriesService.getSubcategory(id, lang);
   }
 
 
