@@ -82,6 +82,15 @@ export class SubcategoriesController {
     return this.subcategoriesService.getSubcategory(id, undefined, lang);
   }
 
+
+  @Get(':id/data')
+  async getSubcategoryData(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('lang') lang: string = 'hi',
+  ) {
+    return this.subcategoriesService.getSubcategoryData(id, lang);
+  }
+
   @Patch(':id')
   update(
     @Param('id') id: string,
