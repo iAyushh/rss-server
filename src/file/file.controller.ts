@@ -155,6 +155,29 @@ export class FileController {
     );
   }
 
+  @Get('tag/:tagName')
+  @ApiQuery({ name: 'type', required: false, enum: FileType })
+  @ApiQuery({ name: 'lang', required: false, type: String })
+  @ApiQuery({ name: 'year', required: false, type: Number })
+  getFilesByTag(
+    @Param('tagName') tagName: string,
+    @Query('lang') queryLang: string,
+    @I18nLang() i18nLang: string,
+    @Query() pagination: PaginatedDto,
+    @Query('type') type?: FileType,
+    @Query('year') year?: number,
+  ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
+
+    return this.fileService.getFilesByTags(tagName, {
+      skip: pagination.skip,
+      take: pagination.take,
+      type,
+      year: year ? Number(year) : undefined,
+      lang,
+    });
+  }
+
   @Get('list/content-types')
   @ApiQuery({ name: 'lang', required: false, type: String })
   getAllContentTypes(

@@ -315,6 +315,54 @@ export class FileService {
     return { data, total };
   }
 
+
+  async getFilesByTags(tagName: string, params?: {
+    skip?: number;
+    take?: number;
+    type?: FileType;
+    year?: number;
+    lang?: string;
+  }) {
+    const { skip = 0, take = 20, type, year, lang = 'hi' } = params || {};
+
+    const where: Prisma.FileAssetWhereInput = {
+      ...(type && { fileType: type }),
+      ...(year && { contentYear: year }),
+      tags: {
+        some: {
+          name: tagName,
+        },
+      },
+    };
+
+    const [files, total] = await Promise.all([
+      this.prisma.fileAsset.findMany({
+        where,
+        include: {
+          tags: true,
+          metadata: { select: { key: true, value: true } },
+          translations: {
+            select: {
+              languageCode: true,
+              displayName: true,
+              description: true,
+            },
+          },
+        },
+        skip,
+        take,
+        orderBy: [{ contentYear: 'desc' }, { uploadedAt: 'desc' }],
+      }),
+      this.prisma.fileAsset.count({ where }),
+    ]);
+    return {
+      files: files.map((f) => this.formatFile(f, lang)),
+      total,
+      skip,
+      take,
+    };
+  }
+
   async getFilesByCategory(
     categoryId: number,
     params?: {
