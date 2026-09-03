@@ -25,16 +25,24 @@ export class CategoryService {
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
-    const slugSource = dto.languageCode === 'en' ? dto.name.trim() : null;
-
     let slug: string;
+    const slugSource = dto.name.trim();
 
-    if (slugSource) {
+    if (dto.languageCode === 'en') {
       slug = slugify(slugSource, {
         lower: true,
         trim: true,
       });
     } else {
+      // Safely map native Hindi text strings directly to URL slugs!
+      slug = slugSource
+        .toLowerCase()
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/[^\w\u0900-\u097F\-]+/g, ''); // Remove all symbols except English, Hindi, and hyphens
+    }
+
+    // Absolute worst-case fallback (e.g. empty string)
+    if (!slug || slug === '-') {
       slug = `category-${Date.now()}`;
     }
 

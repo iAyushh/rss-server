@@ -287,9 +287,14 @@ export class FileService {
     };
   }
 
-  async getTagsWithCount(skip = 0, take = 50) {
+  async getTagsWithCount(skip = 0, take = 50, search?: string) {
+    const where: Prisma.TagWhereInput = search
+      ? { name: { contains: search.toLowerCase(), mode: 'insensitive' } }
+      : {};
+
     const [tags, total] = await Promise.all([
       this.prisma.tag.findMany({
+        where,
         skip,
         take,
         include: {
@@ -303,7 +308,7 @@ export class FileService {
           },
         },
       }),
-      this.prisma.tag.count(),
+      this.prisma.tag.count({ where }),
     ]);
 
     const data = tags.map((tag) => ({
@@ -321,11 +326,12 @@ export class FileService {
     take?: number;
     type?: FileType;
     year?: number;
+    search?: string;
     lang?: string;
   }) {
-    const { skip = 0, take = 20, type, year, lang = 'hi' } = params || {};
+    const { skip = 0, take = 20, type, year, search, lang = 'hi' } = params || {};
 
-    const where: Prisma.FileAssetWhereInput = {
+    const baseWhere: Prisma.FileAssetWhereInput = {
       ...(type && { fileType: type }),
       ...(year && { contentYear: year }),
       tags: {
@@ -334,6 +340,15 @@ export class FileService {
         },
       },
     };
+
+    const where: Prisma.FileAssetWhereInput = search ? {
+      ...baseWhere,
+      OR: [
+        { originalName: { contains: search, mode: 'insensitive' } },
+        { eventName: { contains: search, mode: 'insensitive' } },
+        { translations: { some: { displayName: { contains: search, mode: 'insensitive' } } } }
+      ]
+    } : baseWhere;
 
     const [files, total] = await Promise.all([
       this.prisma.fileAsset.findMany({

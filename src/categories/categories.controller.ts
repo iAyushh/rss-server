@@ -14,7 +14,7 @@ import { CategoryService } from './categories.service';
 import { FileService } from '../file/file.service';
 import { CreateCategoryRequestDto, UpdateCategoryRequestDto } from './dto';
 import { I18nLang } from 'nestjs-i18n';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AccessGuard, JwtAuthGuard, RolesGuard, Roles } from '@Common';
 import { UserType } from '@Common';
 
@@ -35,11 +35,14 @@ export class CategoryController {
   }
 
   @Get()
+  @ApiQuery({ name: 'lang', required: false, type: String })
   findAll(
-    @I18nLang() lang: string,
+    @I18nLang() i18nLang: string,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
+    @Query('lang') queryLang?: string,
   ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
     return this.categoryService.findAll(
       lang,
       skip ? Number(skip) : 0,
@@ -48,12 +51,15 @@ export class CategoryController {
   }
 
   @Get('children/:parentId')
+  @ApiQuery({ name: 'lang', required: false, type: String })
   getChildren(
     @Param('parentId', ParseIntPipe) parentId: number,
-    @I18nLang() lang: string,
+    @I18nLang() i18nLang: string,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
+    @Query('lang') queryLang?: string,
   ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
     return this.categoryService.getChildren(
       parentId,
       lang,
@@ -63,12 +69,15 @@ export class CategoryController {
   }
 
   @Get('explorer/:parentId')
+  @ApiQuery({ name: 'lang', required: false, type: String })
   async getExplorer(
     @Param('parentId', ParseIntPipe) parentId: number,
-    @I18nLang() lang: string,
+    @I18nLang() i18nLang: string,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
+    @Query('lang') queryLang?: string,
   ) {
+    const lang = queryLang ?? i18nLang ?? 'hi';
     const skipNum = skip ? Number(skip) : 0;
     const takeNum = take ? Number(take) : 50;
 

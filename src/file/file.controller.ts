@@ -148,10 +148,16 @@ export class FileController {
     });
   }
   @Get('list/tags')
-  getTags(@Query('skip') skip?: number, @Query('take') take?: number) {
+  @ApiQuery({ name: 'search', required: false })
+  getTags(
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('search') search?: string,
+  ) {
     return this.fileService.getTagsWithCount(
       skip ? Number(skip) : 0,
       take ? Number(take) : 50,
+      search,
     );
   }
 
@@ -159,6 +165,7 @@ export class FileController {
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
   @ApiQuery({ name: 'year', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
   getFilesByTag(
     @Param('tagName') tagName: string,
     @Query('lang') queryLang: string,
@@ -166,6 +173,7 @@ export class FileController {
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
     @Query('year') year?: number,
+    @Query('search') search?: string,
   ) {
     const lang = queryLang ?? i18nLang ?? 'hi';
 
@@ -174,6 +182,7 @@ export class FileController {
       take: pagination.take,
       type,
       year: year ? Number(year) : undefined,
+      search,
       lang,
     });
   }
