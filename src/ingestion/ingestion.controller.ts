@@ -31,9 +31,9 @@ export class IngestionController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['contentTypeId', 'contentYear', 'type', 'files'],
+      required: ['contentYear', 'type', 'files'],
       properties: {
-        contentTypeId: { type: 'number', example: 12 },
+        contentTypeId: { type: 'any', example: 12 },
         contentYear: { type: 'number', example: 2024 },
 
         lang: { type: 'string', example: 'hi' },

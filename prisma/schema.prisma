@@ -160,13 +160,21 @@ enum SettingContext {
 }
 
 model Category {
-  id            Int                   @id @default(autoincrement())
-  slug          String                @unique
+  id   Int    @id @default(autoincrement())
+  slug String @unique
+
+  // Self-referencing fields for 9-level Geographic Unit (Bhaugolik Ikai)
+  parentId Int?       @map("parent_id")
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryToCategory")
+  level    Int        @default(1)
+
   createdAt     DateTime              @default(now()) @map("created_at")
   updatedAt     DateTime              @updatedAt @map("updated_at")
   translations  CategoryTranslation[]
   subcategories Subcategory[]
   contentTypes  ContentType[]
+  files         FileAsset[]
 
   searchVector Unsupported("tsvector")? @map("search_vector")
 
@@ -257,6 +265,8 @@ model ContentType {
 
   // Full Text Search column
   searchVector Unsupported("tsvector")? @map("search_vector")
+  tag          Tag?                     @relation(fields: [tagId], references: [id])
+  tagId        Int?
 
   @@unique([slug, contentYear])
   @@index([categoryId, contentYear])
@@ -281,6 +291,7 @@ model ContentTypeTranslation {
 model FileAsset {
   id           Int     @id @default(autoincrement())
   originalName String? @map("original_name")
+  eventName    String? @map("event_name")
 
   storageKey String @unique @map("storage_key")
   fileSize   Int    @map("file_size")
@@ -290,18 +301,22 @@ model FileAsset {
   fileType    FileType
   contentYear Int?     @map("content_year")
 
-   url String? 
+  url String?
 
   uploadedAt DateTime @default(now()) @map("uploaded_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
 
-  contentTypeId Int         @map("content_type_id")
-  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+  contentTypeId Int?         @map("content_type_id")
+  contentType   ContentType? @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  categoryId    Int?         @map("category_id")
+  category      Category?    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   translations FileTranslation[]
   metadata     FileMetadata[]
+  tags         Tag[]
 
   searchVector Unsupported("tsvector")? @map("search_vector")
 
@@ -355,4 +370,16 @@ model ContentMetadata {
   @@index([key, value])
   @@index([contentTypeId])
   @@map("content_metadata")
+}
+
+model Tag {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  files        FileAsset[]
+  contentTypes ContentType[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("tag")
 }

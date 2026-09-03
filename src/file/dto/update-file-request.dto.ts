@@ -8,6 +8,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+import { ApiProperty } from '@nestjs/swagger';
+
 export class FileTranslationDto {
   @IsString()
   languageCode!: string;
@@ -21,17 +23,23 @@ export class FileTranslationDto {
 }
 
 export class UpdateFileRequestDto {
+  @ApiProperty({ required: false })
+  @IsString()
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FileTranslationDto)
-  translations?: FileTranslationDto[];
+  languageCode?: string;
 
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  displayName?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsInt()
-  categoryId?: number;
-
-  @IsOptional()
-  @IsInt()
-  subcategoryId?: number;
+  parentId?: number;
 }

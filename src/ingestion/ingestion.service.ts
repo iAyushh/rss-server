@@ -11,7 +11,7 @@ export class IngestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileService: FileService,
-  ) {}
+  ) { }
 
   // MIME validation
   private validateFiles(files: Express.Multer.File[], type: FileType) {
@@ -42,13 +42,13 @@ export class IngestionService {
       throw new BadRequestException('No files uploaded');
     }
 
-    const contentType = await this.prisma.contentType.findUnique({
-      where: { id: dto.contentTypeId },
-    });
+    // const contentType = await this.prisma.contentType.findUnique({
+    //   where: { id: dto.contentTypeId },
+    // });
 
-    if (!contentType) {
-      throw new BadRequestException('Invalid contentTypeId');
-    }
+    // if (!contentType) {
+    //   throw new BadRequestException('Invalid contentTypeId');
+    // }
 
     this.validateFiles(files, dto.type);
 
@@ -95,7 +95,7 @@ export class IngestionService {
 
         const asset = await tx.fileAsset.create({
           data: {
-            contentTypeId: dto.contentTypeId,
+            contentTypeId: dto.contentTypeId ?? null,
             originalName: file.originalName,
             storageKey: file.storageKey,
             mimeType: file.mimeType,

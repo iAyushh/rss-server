@@ -9,7 +9,7 @@ export const appConfigFactory = registerAs('app', () => ({
   adminWebUrl: process.env.ADMIN_WEB_URL,
   serverUrl: process.env.SERVER_URL,
   appUri: process.env.APP_URI,
-  httpPayloadMaxSize: '20mb',
+  httpPayloadMaxSize: '100mb',
   platformName: process.env.PLATFORM_NAME,
   diskDestination: resolve(process.cwd(), process.env.STORAGE_DIR ?? 'uploads'),
 }));

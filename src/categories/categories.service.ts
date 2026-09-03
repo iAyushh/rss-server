@@ -17,7 +17,7 @@ export class CategoryService {
     private readonly prisma: PrismaService,
     private readonly i18n: I18nService,
     @Inject(CACHE_MANAGER) private cache: Cache,
-  ) {}
+  ) { }
 
   private async invalidateCache() {
     await this.cache.del('categories:hi');
@@ -25,10 +25,7 @@ export class CategoryService {
   }
 
   async create(dto: CreateCategoryRequestDto, lang: string) {
-    const english = dto.translations.find((t) => t.languageCode === 'en');
-    // const hindi = dto.translations.find((t) => t.languageCode === 'hi');
-
-    const slugSource = english?.name?.trim();
+    const slugSource = dto.languageCode === 'en' ? dto.name.trim() : null;
 
     let slug: string;
 
@@ -57,8 +54,14 @@ export class CategoryService {
     const category = await this.prisma.category.create({
       data: {
         slug,
+        parentId: dto.parentId || null,
+        level: dto.level || 1,
         translations: {
-          create: dto.translations,
+          create: [{
+            languageCode: dto.languageCode,
+            name: dto.name,
+            description: dto.description || null,
+          }],
         },
       },
     });
@@ -114,6 +117,8 @@ WHERE c.id = ${category.id};
       return {
         id: cat.id,
         slug: cat.slug,
+        parentId: cat.parentId,
+        level: cat.level,
         lang: translation.languageCode,
         name: translation.name,
         description: translation.description,
@@ -122,6 +127,44 @@ WHERE c.id = ${category.id};
     const result = { data, total };
     await this.cache.set(cacheKey, result, 600);
     return result;
+  }
+
+  async getChildren(parentId: number, lang: string, skip = 0, take = 20) {
+    const [categories, total] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { parentId },
+        include: { translations: true },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take,
+      }),
+      this.prisma.category.count({ where: { parentId } }),
+    ]);
+
+    const data = categories.map((cat) => {
+      let translation = cat.translations.find(
+        (t: CategoryTranslation) => t.languageCode === lang,
+      );
+      if (!translation && lang !== 'hi') {
+        translation = cat.translations.find(
+          (t: CategoryTranslation) => t.languageCode === 'hi',
+        );
+      }
+      if (!translation) {
+        translation = cat.translations[0];
+      }
+
+      return {
+        id: cat.id,
+        slug: cat.slug,
+        parentId: cat.parentId,
+        level: cat.level,
+        lang: translation.languageCode,
+        name: translation.name,
+        description: translation.description,
+      };
+    });
+    return { data, total };
   }
 
   async update(id: number, dto: UpdateCategoryRequestDto, lang: string) {
@@ -135,29 +178,25 @@ WHERE c.id = ${category.id};
       );
     }
 
-    if (dto.translations?.length) {
-      await this.prisma.$transaction(
-        dto.translations.map((t) =>
-          this.prisma.categoryTranslation.upsert({
-            where: {
-              categoryId_languageCode: {
-                categoryId: id,
-                languageCode: t.languageCode,
-              },
-            },
-            update: {
-              name: t.name,
-              description: t.description ?? null,
-            },
-            create: {
-              categoryId: id,
-              languageCode: t.languageCode,
-              name: t.name,
-              description: t.description ?? null,
-            },
-          }),
-        ),
-      );
+    if (dto.languageCode && dto.name) {
+      await this.prisma.categoryTranslation.upsert({
+        where: {
+          categoryId_languageCode: {
+            categoryId: id,
+            languageCode: dto.languageCode,
+          },
+        },
+        update: {
+          name: dto.name,
+          description: dto.description ?? null,
+        },
+        create: {
+          categoryId: id,
+          languageCode: dto.languageCode,
+          name: dto.name,
+          description: dto.description ?? null,
+        },
+      });
     }
     await this.prisma.$executeRaw`
   UPDATE category c
@@ -202,15 +241,37 @@ WHERE c.id = ${category.id};
       );
     }
 
+    // Geo-location Migration on Deletion
     const contentCount = await this.prisma.contentType.count({
-      where: {
-        categoryId: id,
-      },
+      where: { categoryId: id },
     });
-    if (contentCount > 0) {
-      throw new BadRequestException(
-        'Warning: category has content types remove them first',
-      );
+
+    const childrenCount = await this.prisma.category.count({
+      where: { parentId: id },
+    });
+
+    if (contentCount > 0 || childrenCount > 0) {
+      if (!category.parentId) {
+        throw new BadRequestException(
+          'Warning: This is a root category with nested content/areas. Please migrate the contents before deleting, or set a parent to automate migration.'
+        );
+      }
+
+      // Migrate all children Categories to the parent to preserve hierarchy
+      if (childrenCount > 0) {
+        await this.prisma.category.updateMany({
+          where: { parentId: id },
+          data: { parentId: category.parentId, level: category.level },
+        });
+      }
+
+      // Migrate all Content types tied to this category to the parent category
+      if (contentCount > 0) {
+        await this.prisma.contentType.updateMany({
+          where: { categoryId: id },
+          data: { categoryId: category.parentId },
+        });
+      }
     }
 
     await this.prisma.category.delete({ where: { id } });

@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Patch,
+  Post,
   Get,
   Param,
   ParseIntPipe,
@@ -21,7 +22,7 @@ import {
   UserType,
 } from '@Common';
 import { I18nLang } from 'nestjs-i18n';
-import { UpdateFileRequestDto } from './dto';
+import { UpdateFileRequestDto, BulkCreateFilesDto } from './dto';
 
 @ApiBearerAuth()
 @ApiTags('Files')
@@ -29,7 +30,12 @@ import { UpdateFileRequestDto } from './dto';
 @UseGuards(JwtAuthGuard, AccessGuard, RolesGuard)
 @Controller('files')
 export class FileController {
-  constructor(private readonly fileService: FileService) {}
+  constructor(private readonly fileService: FileService) { }
+
+  @Post('bulk')
+  bulkCreate(@Body() dto: BulkCreateFilesDto) {
+    return this.fileService.bulkCreate(dto);
+  }
 
   @Get()
   @ApiQuery({ name: 'contentTypeId', required: false, type: Number })
@@ -43,11 +49,19 @@ export class FileController {
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
   @ApiQuery({ name: 'lang', required: false, type: String })
+  @ApiQuery({ name: 'tags', required: false, type: String })
+  @ApiQuery({ name: 'eventName', required: false, type: String })
+  @ApiQuery({ name: 'year', required: false, type: Number })
+  @ApiQuery({ name: 'name', required: false, type: String })
   async getAllFiles(
     @Query('contentTypeId') contentTypeId?: number,
     @Query('type') type?: FileType,
     @Query('sortBy') sortBy?: 'updatedAt' | 'fileSize' | 'originalName',
     @Query('order') order?: 'asc' | 'desc',
+    @Query('tags') tags?: string,
+    @Query('eventName') eventName?: string,
+    @Query('year') year?: number,
+    @Query('name') name?: string,
     @Query() pagination?: PaginatedDto,
     @Query('lang') queryLang?: string,
     @I18nLang() i18nLang?: string,
@@ -57,6 +71,10 @@ export class FileController {
     return this.fileService.getAllFiles({
       contentTypeId: contentTypeId ? Number(contentTypeId) : undefined,
       type,
+      tags,
+      eventName,
+      year: year ? Number(year) : undefined,
+      name,
       sortBy,
       order,
       skip: pagination?.skip,
@@ -90,12 +108,14 @@ export class FileController {
   @Get('category/:id')
   @ApiQuery({ name: 'type', required: false, enum: FileType })
   @ApiQuery({ name: 'lang', required: false, type: String })
+  @ApiQuery({ name: 'year', required: false, type: Number })
   getByCategory(
     @Param('id', ParseIntPipe) id: number,
     @Query('lang') queryLang: string,
     @I18nLang() i18nLang: string,
     @Query() pagination: PaginatedDto,
     @Query('type') type?: FileType,
+    @Query('year') year?: number,
   ) {
     const lang = queryLang ?? i18nLang ?? 'hi';
 
@@ -103,6 +123,7 @@ export class FileController {
       skip: pagination.skip,
       take: pagination.take,
       type,
+      year: year ? Number(year) : undefined,
       lang,
     });
   }
@@ -126,6 +147,14 @@ export class FileController {
       lang,
     });
   }
+  @Get('list/tags')
+  getTags(@Query('skip') skip?: number, @Query('take') take?: number) {
+    return this.fileService.getTagsWithCount(
+      skip ? Number(skip) : 0,
+      take ? Number(take) : 50,
+    );
+  }
+
   @Get('list/content-types')
   @ApiQuery({ name: 'lang', required: false, type: String })
   getAllContentTypes(

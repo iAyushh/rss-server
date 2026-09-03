@@ -2,56 +2,59 @@ import {
   Controller,
   ParseFilePipeBuilder,
   Post,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiConsumes, ApiBody, ApiTags } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiBody, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { StorageService, File, JwtAuthGuard, AccessGuard } from '@Common';
 
 @Controller()
 export class AppController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(private readonly storageService: StorageService) { }
 
   @ApiTags('Storage')
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk upload files ' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file'],
       properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
         },
       },
     },
   })
   @UseGuards(JwtAuthGuard, AccessGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('files', 20))
   @Post('upload')
   upload(
-    @UploadedFile(new ParseFilePipeBuilder().build())
-    file: File,
+    @UploadedFiles(new ParseFilePipeBuilder().build({
+      fileIsRequired: true,
+    }))
+    files: Array<File>,
   ) {
-    return {
+    return files.map((file) => ({
       url: this.storageService.getFileUrl(file.filename),
-
       assetPayload: {
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
         storageKey: file.filename,
       },
-
       meta: {
         originalname: file.originalname,
         filename: file.filename,
         mimetype: file.mimetype,
         size: file.size,
       },
-    };
+    }));
   }
 }
